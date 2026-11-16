@@ -23,13 +23,13 @@ interface Zone {
 }
 
 const ZONES: Zone[] = [
-  { id: 'generators', name: 'Generadores', top: '28%', left: '58%', color: '#eab308', areas: ['generators'] },
-  { id: 'turbines', name: 'Turbinas', top: '33%', left: '23%', color: '#f97316', areas: ['turbines'] },
-  { id: 'machining', name: 'Mecanizado', top: '45%', left: '34%', color: '#3b82f6', areas: ['machining'] },
-  { id: 'welding', name: 'Soldadura', top: '45%', left: '50%', color: '#22c55e', areas: ['welding'] },
-  { id: 'quality', name: 'Calidad / Ingeniería', top: '62%', left: '23%', color: '#ec4899', areas: ['quality', 'engineering', 'planning'] },
-  { id: 'workshop', name: 'Taller', top: '55%', left: '62%', color: '#14b8a6', areas: ['workshop'] },
-  { id: 'warehouse', name: 'Almacén', top: '22%', left: '75%', color: '#ef4444', areas: ['warehouse'] },
+  { id: 'generators', name: 'Generadores', top: '28%', left: '58%', color: '#eab308', areas: ['generators', 'generator_shop', 'field_generator'] },
+  { id: 'turbines', name: 'Turbinas', top: '33%', left: '23%', color: '#f97316', areas: ['turbines', 'assembly', 'field_gas', 'field_steam'] },
+  { id: 'machining', name: 'Mecanizado / Balanceo', top: '45%', left: '34%', color: '#3b82f6', areas: ['machining', 'machining_major', 'machining_minor', 'balancing', 'thermal_coatings'] },
+  { id: 'welding', name: 'Soldadura', top: '45%', left: '50%', color: '#22c55e', areas: ['welding', 'special_welding'] },
+  { id: 'quality', name: 'Calidad / Ingeniería', top: '62%', left: '23%', color: '#ec4899', areas: ['quality', 'engineering', 'planning', 'metrology', 'field_engineering', 'projects'] },
+  { id: 'workshop', name: 'Taller / Suministro', top: '55%', left: '62%', color: '#14b8a6', areas: ['workshop', 'supply'] },
+  { id: 'warehouse', name: 'Almacén', top: '22%', left: '75%', color: '#ef4444', areas: ['warehouse', 'material_warehouse'] },
 ];
 
 function routeZone(route: RouteSheetWithRelations): Zone | undefined {

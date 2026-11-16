@@ -15,7 +15,26 @@ import { AREAS } from '@/features/preview/config';
 import type { AreaId, Part } from '@/features/preview/types';
 
 const INSPECTION_AREAS = AREAS.filter((area) =>
-  ['turbines', 'machining', 'welding', 'generators', 'workshop', 'quality'].includes(area.id),
+  [
+    'turbines',
+    'machining',
+    'welding',
+    'generators',
+    'workshop',
+    'quality',
+    'assembly',
+    'machining_major',
+    'machining_minor',
+    'balancing',
+    'special_welding',
+    'generator_shop',
+    'thermal_coatings',
+    'metrology',
+    'field_gas',
+    'field_steam',
+    'field_generator',
+    'field_engineering',
+  ].includes(area.id),
 );
 
 interface AddInspectionDialogProps {

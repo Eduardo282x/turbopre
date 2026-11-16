@@ -15,7 +15,27 @@ import { AREAS } from '@/features/preview/config';
 import type { AreaId, NewSparePartInput, Part } from '@/features/preview/types';
 
 const SPARE_AREAS = AREAS.filter((area) =>
-  ['turbines', 'machining', 'welding', 'generators', 'workshop', 'engineering'].includes(area.id),
+  [
+    'turbines',
+    'machining',
+    'welding',
+    'generators',
+    'workshop',
+    'engineering',
+    'assembly',
+    'machining_major',
+    'machining_minor',
+    'balancing',
+    'special_welding',
+    'generator_shop',
+    'thermal_coatings',
+    'metrology',
+    'field_gas',
+    'field_steam',
+    'field_generator',
+    'field_engineering',
+    'projects',
+  ].includes(area.id),
 );
 
 interface AddSparePartDialogProps {

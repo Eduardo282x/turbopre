@@ -76,10 +76,15 @@ src/
 
 - El frontend del mockup está adaptado y **no** consume el backend. La sesión y
   los datos viven en `src/features/preview/` (zustand + `localStorage`).
+- La entidad central es el **expediente de servicio** (`ServiceOrder`), con modos
+  `SHOP`, `FIELD`, `PROJECT` y `SUPPLY`; la hoja de ruta es su plan de ejecución.
 - Roles del preview: Usuario Global, Planificación y Diseño, Ingeniería, Ventas,
-  Taller, Operador por área, Almacén y Calidad.
+  Taller, Jefe de Sección, Operador por área, Almacén, Calidad, NDT, Metrología,
+  Campo, Proyecto, HSE y Procura.
 - El ciclo de la hoja de ruta es Borrador → En revisión → Aprobada → En
   ejecución → En calidad → Lista para entrega → Entregada.
+- Módulos añadidos sobre el mockup: expedientes, activos, campo, proyectos,
+  suministro, registros NDT/pruebas, no conformidades y calibración.
 - El login de vidrio permite entrar con cualquier usuario del listado y cambiar
   de usuario desde el header. Configuración → **Restablecer datos** vuelve a la
   semilla.

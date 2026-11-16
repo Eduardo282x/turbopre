@@ -11,7 +11,28 @@ import { AREAS, AREA_BY_ID } from '@/features/preview/config';
 import type { AreaId } from '@/features/preview/types';
 
 const SEQUENCE_AREAS = AREAS.filter((area) =>
-  ['engineering', 'turbines', 'machining', 'welding', 'generators', 'workshop', 'quality'].includes(area.id),
+  [
+    'engineering',
+    'turbines',
+    'machining',
+    'welding',
+    'generators',
+    'workshop',
+    'quality',
+    'assembly',
+    'machining_major',
+    'machining_minor',
+    'balancing',
+    'special_welding',
+    'generator_shop',
+    'thermal_coatings',
+    'metrology',
+    'field_gas',
+    'field_steam',
+    'field_generator',
+    'field_engineering',
+    'projects',
+  ].includes(area.id),
 );
 
 interface AreaSequencePickerProps {

@@ -1,6 +1,8 @@
 import { Boxes, CheckCircle2, PackageX, Plus, Trash2, Truck } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
+import { CalibrationStatusBadge } from '@/components/common/badges';
 import { StatusBadge } from '@/components/common/status-badge';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -15,6 +17,7 @@ import { INVENTORY_STATUS_META } from '@/features/preview/config';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import type { InventoryItem } from '@/features/preview/types';
+import { formatDate } from '@/lib/formatters';
 import { canManageInventory } from '@/lib/permissions';
 
 export function InventoryPage() {
@@ -78,6 +81,34 @@ export function InventoryPage() {
       cell: (item) => <span className="text-xs text-muted-foreground">{item.location}</span>,
       hideOnMobile: true,
     },
+    {
+      id: 'trace',
+      header: 'Trazabilidad',
+      cell: (item) => (
+        <div className="text-[11px] text-muted-foreground">
+          <p className="font-mono text-foreground">{item.qrCode ?? 'Sin QR'}</p>
+          <p>{item.controlledAtmosphere ? 'Atmósfera controlada' : 'Ambiente normal'}</p>
+          {item.laserMarked && <p>Marcado láser</p>}
+        </div>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: 'calibration',
+      header: 'Calibración',
+      cell: (item) => {
+        if (!item.calibrationDue) return <span className="text-xs text-muted-foreground">No aplica</span>;
+        const days = Math.ceil((new Date(item.calibrationDue).getTime() - Date.now()) / 86400000);
+        const status = days < 0 ? 'EXPIRED' : days <= 30 ? 'DUE_SOON' : 'VALID';
+        return (
+          <div className="space-y-1 text-xs">
+            <CalibrationStatusBadge status={status} />
+            <p className="text-muted-foreground">{formatDate(item.calibrationDue)}</p>
+          </div>
+        );
+      },
+      hideOnMobile: true,
+    },
   ];
 
   return (
@@ -87,11 +118,16 @@ export function InventoryPage() {
         title="Inventario"
         description="Existencias, ubicaciones y disponibilidad de materiales y herramientas."
         actions={
-          canManageInventory(user) ? (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus /> Registrar producto
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/almacen/calibracion">Calibración</Link>
             </Button>
-          ) : undefined
+            {canManageInventory(user) && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus /> Registrar producto
+              </Button>
+            )}
+          </>
         }
       />
 

@@ -35,7 +35,7 @@ export function PlantPerformancePage() {
   const topClients = getClientVolumeData(db);
 
   const areaMetrics: AreaMetric[] = AREAS.filter((area) =>
-    ['planning', 'engineering', 'turbines', 'machining', 'welding', 'generators', 'workshop', 'quality'].includes(area.id),
+    ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group),
   ).map((area) => {
     const performance = areaPerformance.find((item) => item.areaId === area.id);
     return {

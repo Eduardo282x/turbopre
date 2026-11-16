@@ -6,15 +6,23 @@ import {
 } from '../config';
 import type {
   Area,
+  Asset,
   AuditEntry,
   Client,
   Component,
+  FieldJobWithRelations,
+  NonConformity,
   Part,
   Phase,
   PreviewDatabase,
+  ProjectWithRelations,
+  QualityRecord,
   RouteSheet,
   RouteSheetWithRelations,
+  ServiceOrder,
+  ServiceOrderWithRelations,
   SparePart,
+  SupplyOrderWithRelations,
   User,
 } from '../types';
 
@@ -125,6 +133,30 @@ export function getMyTasks(db: PreviewDatabase, user: User): PhaseWithContext[] 
   if (user.role === 'OPERATOR') {
     return contexts.filter((context) => context.phase.areaId === user.areaId);
   }
+  if (user.role === 'SECTION_CHIEF') {
+    return contexts.filter(
+      (context) => context.phase.areaId === user.areaId || context.phase.type === 'INSPECTION',
+    );
+  }
+  if (user.role === 'NDT') {
+    return contexts.filter(
+      (context) =>
+        context.phase.type === 'INSPECTION' ||
+        context.phase.areaId === 'quality' ||
+        context.phase.areaId === 'metrology',
+    );
+  }
+  if (user.role === 'METROLOGY') {
+    return contexts.filter((context) => context.phase.areaId === 'metrology');
+  }
+  if (user.role === 'FIELD') {
+    return contexts.filter(
+      (context) => context.phase.areaId.startsWith('field_') || context.phase.type === 'INSPECTION',
+    );
+  }
+  if (user.role === 'PROJECT') {
+    return contexts.filter((context) => context.phase.areaId === 'projects');
+  }
   if (user.role === 'QUALITY') {
     return contexts.filter((context) => context.phase.areaId === 'quality' || context.phase.type === 'QUALITY');
   }
@@ -153,6 +185,7 @@ export function getMyTasks(db: PreviewDatabase, user: User): PhaseWithContext[] 
         context.route.status === 'READY_FOR_DELIVERY' || context.route.status === 'DELIVERED',
     );
   }
+  if (user.role === 'HSE' || user.role === 'PROCUREMENT') return [];
   return contexts;
 }
 
@@ -216,7 +249,7 @@ export function getStatusChartData(db: PreviewDatabase) {
 }
 
 export function getAreaWorkloadData(db: PreviewDatabase) {
-  return AREAS.filter((area) => ['production', 'engineering', 'support'].includes(area.group)).map((area) => ({
+  return AREAS.filter((area) => ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group)).map((area) => ({
     areaId: area.id,
     name: area.shortName,
     value: db.phases.filter(
@@ -227,7 +260,7 @@ export function getAreaWorkloadData(db: PreviewDatabase) {
 }
 
 export function getAreaPerformanceData(db: PreviewDatabase) {
-  return AREAS.filter((area) => ['production', 'engineering', 'support'].includes(area.group)).map((area) => {
+  return AREAS.filter((area) => ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group)).map((area) => {
     const durations = db.phases
       .filter(
         (phase) =>
@@ -285,4 +318,157 @@ export function getUpcomingDeliveries(db: PreviewDatabase) {
     )
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 5);
+}
+
+export function getAssetById(db: PreviewDatabase, assetId?: string): Asset | undefined {
+  return assetId ? db.assets.find((asset) => asset.id === assetId) : undefined;
+}
+
+export function getServiceOrderProgress(order: ServiceOrder, db: PreviewDatabase): number {
+  if (order.routeSheetId) {
+    const route = (db.routeSheets ?? []).find((item) => item.id === order.routeSheetId);
+    if (route) {
+      const phases = (db.phases ?? []).filter((phase) => phase.routeSheetId === route.id);
+      return getRouteProgress(phases).progress;
+    }
+  }
+  const project = (db.projects ?? []).find((item) => item.serviceOrderId === order.id);
+  if (project) return project.progress;
+  const fieldJob = (db.fieldJobs ?? []).find((item) => item.serviceOrderId === order.id);
+  if (fieldJob) {
+    const fieldProgress: Record<string, number> = {
+      PLANNED: 10,
+      MOBILIZED: 30,
+      IN_EXECUTION: 60,
+      DEMOBILIZED: 85,
+      CLOSED: 100,
+    };
+    return fieldProgress[fieldJob.status] ?? 0;
+  }
+  const supply = (db.supplyOrders ?? []).find((item) => item.serviceOrderId === order.id);
+  if (supply) {
+    const supplyProgress: Record<string, number> = {
+      REQUESTED: 10,
+      QUOTED: 25,
+      PURCHASED: 45,
+      INSPECTION: 70,
+      DISPATCHED: 85,
+      DELIVERED: 100,
+    };
+    return supplyProgress[supply.status] ?? 0;
+  }
+  return 0;
+}
+
+export function getServiceOrderWithRelations(
+  db: PreviewDatabase,
+  orderId: string,
+): ServiceOrderWithRelations | undefined {
+  const order = (db.serviceOrders ?? []).find((item) => item.id === orderId);
+  if (!order) return undefined;
+  const qualityRecords = (db.qualityRecords ?? []).filter((record) => record.serviceOrderId === order.id);
+  const nonConformities = (db.nonConformities ?? []).filter((record) => record.serviceOrderId === order.id);
+  return {
+    ...order,
+    client: getClientById(db, order.clientId),
+    asset: getAssetById(db, order.assetId),
+    creator: getUserById(db, order.createdBy) ?? db.users[0],
+    routeSheet: order.routeSheetId ? getRouteSheetWithRelations(db, order.routeSheetId) : undefined,
+    fieldJob: (db.fieldJobs ?? []).find((item) => item.serviceOrderId === order.id),
+    project: (db.projects ?? []).find((item) => item.serviceOrderId === order.id),
+    supplyOrder: (db.supplyOrders ?? []).find((item) => item.serviceOrderId === order.id),
+    qualityRecords,
+    nonConformities,
+    progress: getServiceOrderProgress(order, db),
+    openNonConformities: nonConformities.filter((record) => record.status !== 'CLOSED').length,
+  };
+}
+
+export function getServiceOrdersWithRelations(db: PreviewDatabase): ServiceOrderWithRelations[] {
+  return (db.serviceOrders ?? [])
+    .map((order) => getServiceOrderWithRelations(db, order.id))
+    .filter((order): order is ServiceOrderWithRelations => Boolean(order));
+}
+
+export function getServiceOrderMetrics(db: PreviewDatabase) {
+  const orders = db.serviceOrders ?? [];
+  const nonConformities = db.nonConformities ?? [];
+  const qualityRecords = db.qualityRecords ?? [];
+  return {
+    total: orders.length,
+    shop: orders.filter((order) => order.mode === 'SHOP').length,
+    field: orders.filter((order) => order.mode === 'FIELD').length,
+    project: orders.filter((order) => order.mode === 'PROJECT').length,
+    supply: orders.filter((order) => order.mode === 'SUPPLY').length,
+    active: orders.filter((order) => ['APPROVED', 'IN_EXECUTION', 'IN_QUALITY'].includes(order.status)).length,
+    inQuality: orders.filter((order) => order.status === 'IN_QUALITY').length,
+    readyForDelivery: orders.filter((order) => order.status === 'READY_FOR_DELIVERY').length,
+    delivered: orders.filter((order) => ['DELIVERED', 'CLOSED'].includes(order.status)).length,
+    critical: orders.filter((order) => order.priority === 'CRITICAL' && !['DELIVERED', 'CLOSED', 'CANCELLED'].includes(order.status)).length,
+    openNonConformities: nonConformities.filter((record) => record.status !== 'CLOSED').length,
+    pendingQualityRecords: qualityRecords.filter((record) => record.result === 'PENDING').length,
+    failedQualityRecords: qualityRecords.filter((record) => record.result === 'FAIL').length,
+  };
+}
+
+export function getFieldJobsWithRelations(db: PreviewDatabase): FieldJobWithRelations[] {
+  const relations: Array<FieldJobWithRelations | null> = (db.fieldJobs ?? []).map((job) => {
+    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === job.serviceOrderId);
+    if (!serviceOrder) return null;
+    return {
+      ...job,
+      serviceOrder,
+      client: getClientById(db, serviceOrder.clientId),
+      asset: getAssetById(db, serviceOrder.assetId),
+    };
+  });
+  return relations.filter((job): job is FieldJobWithRelations => job !== null);
+}
+
+export function getProjectsWithRelations(db: PreviewDatabase): ProjectWithRelations[] {
+  const relations: Array<ProjectWithRelations | null> = (db.projects ?? []).map((project) => {
+    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === project.serviceOrderId);
+    if (!serviceOrder) return null;
+    return {
+      ...project,
+      serviceOrder,
+      client: getClientById(db, serviceOrder.clientId),
+      asset: getAssetById(db, serviceOrder.assetId),
+    };
+  });
+  return relations.filter((project): project is ProjectWithRelations => project !== null);
+}
+
+export function getSupplyOrdersWithRelations(db: PreviewDatabase): SupplyOrderWithRelations[] {
+  const relations: Array<SupplyOrderWithRelations | null> = (db.supplyOrders ?? []).map((supply) => {
+    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === supply.serviceOrderId);
+    if (!serviceOrder) return null;
+    return {
+      ...supply,
+      serviceOrder,
+      client: getClientById(db, serviceOrder.clientId),
+      asset: getAssetById(db, serviceOrder.assetId),
+    };
+  });
+  return relations.filter((supply): supply is SupplyOrderWithRelations => supply !== null);
+}
+
+export function getCalibrationItems(db: PreviewDatabase) {
+  return (db.inventory ?? [])
+    .filter((item) => item.calibrationDue)
+    .map((item) => {
+      const due = new Date(item.calibrationDue as string).getTime();
+      const days = Math.ceil((due - Date.now()) / 86400000);
+      const status: 'VALID' | 'DUE_SOON' | 'EXPIRED' = days < 0 ? 'EXPIRED' : days <= 30 ? 'DUE_SOON' : 'VALID';
+      return { item, days, status };
+    })
+    .sort((a, b) => a.days - b.days);
+}
+
+export function getOpenNonConformities(db: PreviewDatabase): NonConformity[] {
+  return (db.nonConformities ?? []).filter((record) => record.status !== 'CLOSED');
+}
+
+export function getQualityRecordsByType(db: PreviewDatabase, type: QualityRecord['type']): QualityRecord[] {
+  return (db.qualityRecords ?? []).filter((record) => record.type === type);
 }

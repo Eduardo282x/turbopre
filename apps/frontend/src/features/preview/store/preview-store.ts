@@ -4,20 +4,29 @@ import { seedDatabase } from '../data/seed';
 import type {
   AuditAction,
   AreaId,
+  FieldJobStatus,
   InventoryStatus,
   NewClientInput,
   NewInventoryItemInput,
   NewLoanInput,
+  NewNonConformityInput,
   NewPartInput,
+  NewQualityRecordInput,
   NewRouteSheetInput,
+  NewServiceOrderInput,
   NewSparePartInput,
   NewUserInput,
+  NonConformityStatus,
   Part,
   Phase,
   PhaseType,
   PreviewDatabase,
+  ProjectPhase,
+  QualityResult,
   RouteStatus,
+  ServiceOrderStatus,
   SparePartStatus,
+  SupplyStatus,
 } from '../types';
 
 function makeId(prefix: string): string {
@@ -164,6 +173,109 @@ function maybeMoveToQuality(db: PreviewDatabase, routeId: string): PreviewDataba
   };
 }
 
+function nextServiceOrderCode(db: PreviewDatabase): string {
+  const year = new Date().getFullYear();
+  const prefix = `EXP-${year}-`;
+  const highest = db.serviceOrders
+    .map((order) => order.code)
+    .filter((code) => code.startsWith(prefix))
+    .map((code) => Number(code.replace(prefix, '')))
+    .filter((value) => Number.isFinite(value))
+    .reduce((max, value) => Math.max(max, value), 0);
+  return `${prefix}${String(highest + 1).padStart(3, '0')}`;
+}
+
+function createRouteSheetForServiceOrder(
+  db: PreviewDatabase,
+  serviceOrderId: string,
+  templateId: string,
+  actorId: string,
+): { db: PreviewDatabase; routeSheetId: string } | null {
+  const order = db.serviceOrders.find((item) => item.id === serviceOrderId);
+  const template = db.serviceTemplates.find((item) => item.id === templateId);
+  if (!order || !template) return null;
+
+  const asset = db.assets.find((item) => item.id === order.assetId);
+  const client = db.clients.find((item) => item.id === order.clientId);
+  const componentId = `comp-${asset?.id ?? serviceOrderId}`;
+  const component =
+    db.components.find((item) => item.id === componentId) ??
+    ({
+      id: componentId,
+      name: asset ? `${asset.manufacturer} ${asset.model}` : `Servicio ${order.code}`,
+      serial: asset?.serial ?? order.code,
+      type: asset?.type ?? 'Servicio',
+    } as const);
+
+  const routeId = makeId('route');
+  const partId = makeId('part');
+  const routeCode = nextRouteCode(db);
+  const now = new Date().toISOString();
+  const phases: Phase[] = template.items.map((item, index) => ({
+    id: makeId('phase'),
+    routeSheetId: routeId,
+    partId,
+    areaId: item.areaId,
+    order: (index + 1) * 10,
+    name: item.name,
+    description: item.requiresDocument
+      ? `${item.name}. Documento requerido: ${item.requiresDocument}.`
+      : item.name,
+    type: item.type,
+    status: index === 0 ? 'PENDING' : 'BLOCKED',
+    responsibleId: db.users.find((user) => user.areaId === item.areaId && user.active)?.id,
+  }));
+
+  const routeSheet = {
+    id: routeId,
+    code: routeCode,
+    componentId,
+    clientId: order.clientId,
+    serviceOrderId,
+    templateId,
+    description: `${order.description} · ${client?.name ?? 'Cliente'}`,
+    status: 'DRAFT' as RouteStatus,
+    priority: order.priority,
+    createdAt: now,
+    updatedAt: now,
+    dueDate: order.dueDate,
+    createdBy: actorId,
+  };
+
+  const part = {
+    id: partId,
+    routeSheetId: routeId,
+    name: asset ? `${asset.model} · ${template.name}` : template.name,
+    quantity: 1,
+    status: 'PENDING' as const,
+    areaId: template.items[0]?.areaId ?? 'workshop',
+  };
+
+  let nextDb: PreviewDatabase = {
+    ...db,
+    components: db.components.some((item) => item.id === componentId)
+      ? db.components
+      : [...db.components, component],
+    routeSheets: [routeSheet, ...db.routeSheets],
+    parts: [...db.parts, part],
+    phases: [...db.phases, ...phases],
+    serviceOrders: db.serviceOrders.map((item) =>
+      item.id === serviceOrderId ? { ...item, routeSheetId: routeId } : item,
+    ),
+  };
+
+  nextDb = pushAudit(
+    nextDb,
+    actorId,
+    'CREATE',
+    'Hoja de ruta',
+    routeCode,
+    `Hoja de ruta creada desde plantilla "${template.name}" para ${order.code}.`,
+  );
+
+  return { db: nextDb, routeSheetId: routeId };
+}
+
 interface PreviewActions {
   resetPreview: () => void;
   logLogin: (actorId: string) => void;
@@ -201,6 +313,18 @@ interface PreviewActions {
   createUser: (input: NewUserInput, actorId: string) => void;
   deleteUser: (userId: string, actorId: string) => void;
   createClient: (input: NewClientInput, actorId: string) => void;
+  createServiceOrder: (input: NewServiceOrderInput, actorId: string) => string;
+  updateServiceOrderStatus: (id: string, status: ServiceOrderStatus, actorId: string) => void;
+  createRouteSheetFromTemplate: (serviceOrderId: string, templateId: string, actorId: string) => string | null;
+  updateFieldJobStatus: (id: string, status: FieldJobStatus, actorId: string) => void;
+  updateFieldJobReport: (id: string, report: string, actorId: string) => void;
+  updateProjectPhase: (id: string, phase: ProjectPhase, progress: number, actorId: string) => void;
+  updateSupplyStatus: (id: string, status: SupplyStatus, actorId: string) => void;
+  createQualityRecord: (input: NewQualityRecordInput, actorId: string) => void;
+  updateQualityRecordResult: (id: string, result: QualityResult, actorId: string) => void;
+  createNonConformity: (input: NewNonConformityInput, actorId: string) => void;
+  updateNonConformityStatus: (id: string, status: NonConformityStatus, actorId: string) => void;
+  calibrateInventoryItem: (id: string, dueDate: string, certificate: string, actorId: string) => void;
 }
 
 interface PreviewStore extends PreviewActions {
@@ -770,10 +894,368 @@ export const usePreviewStore = create<PreviewStore>()(
           };
         });
       },
+
+      createServiceOrder: (input, actorId) => {
+        const id = makeId('so');
+        set((state) => {
+          const order = {
+            id,
+            code: nextServiceOrderCode(state.db),
+            mode: input.mode,
+            status: 'RECEIVED' as ServiceOrderStatus,
+            clientId: input.clientId,
+            assetId: input.assetId,
+            site: input.site,
+            scope: input.scope,
+            description: input.description,
+            priority: input.priority,
+            createdAt: new Date().toISOString(),
+            dueDate: new Date(input.dueDate).toISOString(),
+            createdBy: actorId,
+          };
+          let db: PreviewDatabase = {
+            ...state.db,
+            serviceOrders: [order, ...state.db.serviceOrders],
+          };
+
+          if (input.mode === 'FIELD') {
+            db = {
+              ...db,
+              fieldJobs: [
+                {
+                  id: makeId('field'),
+                  serviceOrderId: id,
+                  siteName: input.fieldSite?.siteName ?? input.site,
+                  location: input.fieldSite?.location ?? input.site,
+                  permits: input.fieldSite?.permits ?? 'Pendiente',
+                  riskAnalysis: input.fieldSite?.riskAnalysis ?? 'Pendiente',
+                  crew: input.fieldSite?.crew ? input.fieldSite.crew.split(',').map((item) => item.trim()).filter(Boolean) : [],
+                  containers: input.fieldSite?.containers ?? 1,
+                  cranes: input.fieldSite?.cranes ?? 'Por definir',
+                  status: 'PLANNED' as FieldJobStatus,
+                },
+                ...db.fieldJobs,
+              ],
+            };
+          }
+
+          if (input.mode === 'PROJECT') {
+            db = {
+              ...db,
+              projects: [
+                {
+                  id: makeId('project'),
+                  serviceOrderId: id,
+                  name: input.projectName ?? input.description,
+                  phase: 'ENGINEERING' as ProjectPhase,
+                  progress: 0,
+                  milestones: [
+                    { id: makeId('pm'), name: 'Ingeniería', phase: 'ENGINEERING' as ProjectPhase, status: 'IN_PROGRESS' as const },
+                    { id: makeId('pm'), name: 'Procura', phase: 'PROCUREMENT' as ProjectPhase, status: 'PENDING' as const },
+                    { id: makeId('pm'), name: 'Construcción', phase: 'CONSTRUCTION' as ProjectPhase, status: 'PENDING' as const },
+                    { id: makeId('pm'), name: 'Comisionamiento', phase: 'COMMISSIONING' as ProjectPhase, status: 'PENDING' as const },
+                  ],
+                },
+                ...db.projects,
+              ],
+            };
+          }
+
+          if (input.mode === 'SUPPLY') {
+            db = {
+              ...db,
+              supplyOrders: [
+                {
+                  id: makeId('supply'),
+                  serviceOrderId: id,
+                  status: 'REQUESTED' as SupplyStatus,
+                  items: (input.supplyItems ?? []).map((item) => ({
+                    id: makeId('si'),
+                    name: item.name,
+                    code: item.code,
+                    quantity: item.quantity,
+                    status: 'REQUESTED' as SupplyStatus,
+                  })),
+                },
+                ...db.supplyOrders,
+              ],
+            };
+          }
+
+          db = pushAudit(db, actorId, 'CREATE', 'Expediente', order.code, `Expediente ${order.code} creado en modo ${input.mode}.`);
+          if (input.templateId) {
+            const result = createRouteSheetForServiceOrder(db, id, input.templateId, actorId);
+            if (result) db = result.db;
+          }
+          return { db };
+        });
+        return id;
+      },
+
+      updateServiceOrderStatus: (id, status, actorId) => {
+        set((state) => {
+          const order = state.db.serviceOrders.find((item) => item.id === id);
+          if (!order) return state;
+          const routeStatusMap: Partial<Record<ServiceOrderStatus, RouteStatus>> = {
+            RECEIVED: 'DRAFT',
+            DIAGNOSIS: 'DRAFT',
+            SCOPING: 'DRAFT',
+            PLANNING: 'DRAFT',
+            APPROVED: 'APPROVED',
+            IN_EXECUTION: 'IN_PROGRESS',
+            IN_QUALITY: 'IN_QUALITY',
+            READY_FOR_DELIVERY: 'READY_FOR_DELIVERY',
+            DELIVERED: 'DELIVERED',
+            CLOSED: 'DELIVERED',
+          };
+          const routeStatus = routeStatusMap[status];
+          const db: PreviewDatabase = {
+            ...state.db,
+            serviceOrders: state.db.serviceOrders.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    status,
+                    approvedBy: status === 'APPROVED' ? actorId : item.approvedBy,
+                    approvedAt: status === 'APPROVED' ? new Date().toISOString() : item.approvedAt,
+                  }
+                : item,
+            ),
+            routeSheets: order.routeSheetId && routeStatus
+              ? state.db.routeSheets.map((route) =>
+                  route.id === order.routeSheetId
+                    ? {
+                        ...route,
+                        status: routeStatus,
+                        approvedBy: routeStatus === 'APPROVED' ? actorId : route.approvedBy,
+                        approvedAt: routeStatus === 'APPROVED' ? new Date().toISOString() : route.approvedAt,
+                        deliveredAt: routeStatus === 'DELIVERED' ? new Date().toISOString() : route.deliveredAt,
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : route,
+                )
+              : state.db.routeSheets,
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Expediente', order.code, `Estado actualizado a ${status}.`),
+          };
+        });
+      },
+
+      createRouteSheetFromTemplate: (serviceOrderId, templateId, actorId) => {
+        let routeSheetId: string | null = null;
+        set((state) => {
+          const result = createRouteSheetForServiceOrder(state.db, serviceOrderId, templateId, actorId);
+          if (!result) return state;
+          routeSheetId = result.routeSheetId;
+          return { db: result.db };
+        });
+        return routeSheetId;
+      },
+
+      updateFieldJobStatus: (id, status, actorId) => {
+        set((state) => {
+          const job = state.db.fieldJobs.find((item) => item.id === id);
+          if (!job) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            fieldJobs: state.db.fieldJobs.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    status,
+                    mobilizationDate: status === 'MOBILIZED' ? new Date().toISOString() : item.mobilizationDate,
+                    demobilizationDate: status === 'DEMOBILIZED' ? new Date().toISOString() : item.demobilizationDate,
+                  }
+                : item,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Campo', job.id, `Movilización actualizada a ${status}.`),
+          };
+        });
+      },
+
+      updateFieldJobReport: (id, report, actorId) => {
+        set((state) => {
+          const job = state.db.fieldJobs.find((item) => item.id === id);
+          if (!job) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            fieldJobs: state.db.fieldJobs.map((item) => (item.id === id ? { ...item, report } : item)),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Campo', job.id, 'Reporte de campo actualizado.'),
+          };
+        });
+      },
+
+      updateProjectPhase: (id, phase, progress, actorId) => {
+        set((state) => {
+          const project = state.db.projects.find((item) => item.id === id);
+          if (!project) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            projects: state.db.projects.map((item) =>
+              item.id === id ? { ...item, phase, progress } : item,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Proyecto', project.id, `Fase actualizada a ${phase} (${progress}%).`),
+          };
+        });
+      },
+
+      updateSupplyStatus: (id, status, actorId) => {
+        set((state) => {
+          const supply = state.db.supplyOrders.find((item) => item.id === id);
+          if (!supply) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            supplyOrders: state.db.supplyOrders.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    status,
+                    deliveredAt: status === 'DELIVERED' ? new Date().toISOString() : item.deliveredAt,
+                  }
+                : item,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Suministro', supply.id, `Estado actualizado a ${status}.`),
+          };
+        });
+      },
+
+      createQualityRecord: (input, actorId) => {
+        set((state) => {
+          const order = state.db.serviceOrders.find((item) => item.id === input.serviceOrderId);
+          if (!order) return state;
+          const record = {
+            id: makeId('quality'),
+            ...input,
+            result: 'PENDING' as QualityResult,
+          };
+          const db: PreviewDatabase = {
+            ...state.db,
+            qualityRecords: [record, ...state.db.qualityRecords],
+          };
+          return {
+            db: pushAudit(db, actorId, 'CREATE', 'Calidad', record.id, `Registro ${input.type} creado para ${order.code}.`),
+          };
+        });
+      },
+
+      updateQualityRecordResult: (id, result, actorId) => {
+        set((state) => {
+          const record = state.db.qualityRecords.find((item) => item.id === id);
+          if (!record) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            qualityRecords: state.db.qualityRecords.map((item) =>
+              item.id === id
+                ? { ...item, result, testedAt: result === 'PENDING' ? item.testedAt : new Date().toISOString() }
+                : item,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, result === 'FAIL' ? 'REJECT' : 'APPROVE', 'Calidad', record.id, `Resultado ${result}.`),
+          };
+        });
+      },
+
+      createNonConformity: (input, actorId) => {
+        set((state) => {
+          const order = state.db.serviceOrders.find((item) => item.id === input.serviceOrderId);
+          if (!order) return state;
+          const record = {
+            id: makeId('nc'),
+            ...input,
+            status: 'OPEN' as NonConformityStatus,
+            createdAt: new Date().toISOString(),
+          };
+          const db: PreviewDatabase = {
+            ...state.db,
+            nonConformities: [record, ...state.db.nonConformities],
+          };
+          return {
+            db: pushAudit(db, actorId, 'CREATE', 'No conformidad', record.id, `No conformidad registrada para ${order.code}.`),
+          };
+        });
+      },
+
+      updateNonConformityStatus: (id, status, actorId) => {
+        set((state) => {
+          const record = state.db.nonConformities.find((item) => item.id === id);
+          if (!record) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            nonConformities: state.db.nonConformities.map((item) =>
+              item.id === id
+                ? { ...item, status, closedAt: status === 'CLOSED' ? new Date().toISOString() : item.closedAt }
+                : item,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'No conformidad', record.id, `Estado actualizado a ${status}.`),
+          };
+        });
+      },
+
+      calibrateInventoryItem: (id, dueDate, certificate, actorId) => {
+        set((state) => {
+          const item = state.db.inventory.find((entry) => entry.id === id);
+          if (!item) return state;
+          const db: PreviewDatabase = {
+            ...state.db,
+            inventory: state.db.inventory.map((entry) =>
+              entry.id === id
+                ? { ...entry, calibrationDue: dueDate, certificate }
+                : entry,
+            ),
+          };
+          return {
+            db: pushAudit(db, actorId, 'UPDATE', 'Calibración', item.id, `Instrumento calibrado. Vence ${dueDate}.`),
+          };
+        });
+      },
     }),
     {
       name: 'turbopre.preview.db',
-      version: 1,
+      version: 2,
+      migrate: () => ({ db: seedDatabase() }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as { db?: Partial<PreviewDatabase> } | undefined;
+        const persistedDb = persisted?.db;
+        const seed = seedDatabase();
+        return {
+          ...currentState,
+          ...persisted,
+          db: {
+            ...seed,
+            ...persistedDb,
+            users: persistedDb?.users ?? seed.users,
+            clients: persistedDb?.clients ?? seed.clients,
+            components: persistedDb?.components ?? seed.components,
+            assets: persistedDb?.assets ?? seed.assets,
+            serviceOrders: persistedDb?.serviceOrders ?? seed.serviceOrders,
+            serviceTemplates: persistedDb?.serviceTemplates ?? seed.serviceTemplates,
+            fieldJobs: persistedDb?.fieldJobs ?? seed.fieldJobs,
+            projects: persistedDb?.projects ?? seed.projects,
+            supplyOrders: persistedDb?.supplyOrders ?? seed.supplyOrders,
+            qualityRecords: persistedDb?.qualityRecords ?? seed.qualityRecords,
+            nonConformities: persistedDb?.nonConformities ?? seed.nonConformities,
+            routeSheets: persistedDb?.routeSheets ?? seed.routeSheets,
+            parts: persistedDb?.parts ?? seed.parts,
+            phases: persistedDb?.phases ?? seed.phases,
+            spareParts: persistedDb?.spareParts ?? seed.spareParts,
+            inventory: persistedDb?.inventory ?? seed.inventory,
+            loans: persistedDb?.loans ?? seed.loans,
+            audit: persistedDb?.audit ?? seed.audit,
+          },
+        };
+      },
     },
   ),
 );

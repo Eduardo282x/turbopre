@@ -6,18 +6,26 @@ import { Layout } from '@/components/layout/layout';
 import { ALL_ROLES } from '@/lib/navigation';
 
 const roles = {
-  routes: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'QUALITY', 'SALES'] as const,
-  routeHistory: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'QUALITY', 'SALES'] as const,
-  tasks: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'QUALITY'] as const,
-  approvals: ['GLOBAL', 'ENGINEERING'] as const,
+  routes: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'QUALITY', 'SALES', 'FIELD', 'PROJECT', 'SECTION_CHIEF', 'NDT'] as const,
+  routeHistory: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'QUALITY', 'SALES', 'PROJECT', 'SECTION_CHIEF'] as const,
+  tasks: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'QUALITY', 'FIELD', 'SECTION_CHIEF', 'NDT', 'METROLOGY'] as const,
+  approvals: ['GLOBAL', 'ENGINEERING', 'SECTION_CHIEF'] as const,
   sales: ['GLOBAL', 'PLANNING', 'SALES'] as const,
-  inspections: ['GLOBAL', 'ENGINEERING', 'WORKSHOP', 'OPERATOR'] as const,
-  spares: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR'] as const,
-  warehouse: ['GLOBAL', 'WAREHOUSE'] as const,
-  quality: ['GLOBAL', 'QUALITY'] as const,
-  analytics: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'SALES'] as const,
-  plant: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR'] as const,
+  inspections: ['GLOBAL', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'SECTION_CHIEF', 'NDT', 'FIELD'] as const,
+  spares: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'SECTION_CHIEF', 'PROCUREMENT'] as const,
+  warehouse: ['GLOBAL', 'WAREHOUSE', 'METROLOGY'] as const,
+  quality: ['GLOBAL', 'QUALITY', 'NDT', 'SECTION_CHIEF'] as const,
+  analytics: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'SALES', 'PROJECT', 'FIELD', 'SECTION_CHIEF', 'NDT'] as const,
+  plant: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'FIELD', 'SECTION_CHIEF'] as const,
   admin: ['GLOBAL'] as const,
+  serviceOrders: ['GLOBAL', 'PLANNING', 'SALES', 'ENGINEERING', 'WORKSHOP', 'QUALITY', 'FIELD', 'PROJECT', 'NDT', 'METROLOGY', 'HSE', 'PROCUREMENT', 'SECTION_CHIEF'] as const,
+  shop: ['GLOBAL', 'WORKSHOP', 'SECTION_CHIEF', 'ENGINEERING', 'OPERATOR'] as const,
+  field: ['GLOBAL', 'FIELD', 'PROJECT', 'HSE', 'WORKSHOP', 'ENGINEERING', 'SECTION_CHIEF'] as const,
+  projects: ['GLOBAL', 'PROJECT', 'ENGINEERING', 'PROCUREMENT', 'HSE'] as const,
+  supply: ['GLOBAL', 'PROCUREMENT', 'SALES', 'WAREHOUSE', 'PROJECT'] as const,
+  qualityRecords: ['GLOBAL', 'QUALITY', 'NDT', 'ENGINEERING', 'SECTION_CHIEF'] as const,
+  nonConformities: ['GLOBAL', 'QUALITY', 'NDT', 'ENGINEERING', 'HSE', 'SECTION_CHIEF'] as const,
+  calibration: ['GLOBAL', 'WAREHOUSE', 'METROLOGY', 'QUALITY'] as const,
 };
 
 // Type helper to keep the role arrays literal and compatible with RoleId[].
@@ -48,6 +56,26 @@ export const router = createBrowserRouter([
                   const { DashboardPage } = await import('@/pages/dashboard/dashboard-page');
                   return { Component: DashboardPage };
                 },
+              },
+              {
+                path: 'expedientes',
+                element: <RoleGuard roles={roleList(roles.serviceOrders)} />,
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => {
+                      const { ExpedientesPage } = await import('@/pages/expedientes/expedientes-page');
+                      return { Component: ExpedientesPage };
+                    },
+                  },
+                  {
+                    path: ':id',
+                    lazy: async () => {
+                      const { ExpedienteDetailPage } = await import('@/pages/expedientes/expediente-detail-page');
+                      return { Component: ExpedienteDetailPage };
+                    },
+                  },
+                ],
               },
               {
                 path: 'mis-tareas',
@@ -136,6 +164,18 @@ export const router = createBrowserRouter([
                 path: 'taller',
                 children: [
                   {
+                    element: <RoleGuard roles={roleList(roles.shop)} />,
+                    children: [
+                      {
+                        index: true,
+                        lazy: async () => {
+                          const { WorkshopDashboardPage } = await import('@/pages/workshop/workshop-dashboard-page');
+                          return { Component: WorkshopDashboardPage };
+                        },
+                      },
+                    ],
+                  },
+                  {
                     path: 'inspecciones',
                     element: <RoleGuard roles={roleList(roles.inspections)} />,
                     children: [
@@ -164,6 +204,45 @@ export const router = createBrowserRouter([
                 ],
               },
               {
+                path: 'campo',
+                element: <RoleGuard roles={roleList(roles.field)} />,
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => {
+                      const { FieldPage } = await import('@/pages/field/field-page');
+                      return { Component: FieldPage };
+                    },
+                  },
+                ],
+              },
+              {
+                path: 'proyectos',
+                element: <RoleGuard roles={roleList(roles.projects)} />,
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => {
+                      const { ProjectsPage } = await import('@/pages/projects/projects-page');
+                      return { Component: ProjectsPage };
+                    },
+                  },
+                ],
+              },
+              {
+                path: 'suministro',
+                element: <RoleGuard roles={roleList(roles.supply)} />,
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => {
+                      const { SupplyPage } = await import('@/pages/supply/supply-page');
+                      return { Component: SupplyPage };
+                    },
+                  },
+                ],
+              },
+              {
                 path: 'almacen',
                 element: <RoleGuard roles={roleList(roles.warehouse)} />,
                 children: [
@@ -188,6 +267,19 @@ export const router = createBrowserRouter([
                       return { Component: LoansPage };
                     },
                   },
+                  {
+                    path: 'calibracion',
+                    element: <RoleGuard roles={roleList(roles.calibration)} />,
+                    children: [
+                      {
+                        index: true,
+                        lazy: async () => {
+                          const { CalibrationPage } = await import('@/pages/warehouse/calibration-page');
+                          return { Component: CalibrationPage };
+                        },
+                      },
+                    ],
+                  },
                 ],
               },
               {
@@ -207,6 +299,32 @@ export const router = createBrowserRouter([
                       const { QualityApprovalsPage } = await import('@/pages/quality/quality-approvals-page');
                       return { Component: QualityApprovalsPage };
                     },
+                  },
+                  {
+                    path: 'registros',
+                    element: <RoleGuard roles={roleList(roles.qualityRecords)} />,
+                    children: [
+                      {
+                        index: true,
+                        lazy: async () => {
+                          const { QualityRecordsPage } = await import('@/pages/quality/quality-records-page');
+                          return { Component: QualityRecordsPage };
+                        },
+                      },
+                    ],
+                  },
+                  {
+                    path: 'no-conformidades',
+                    element: <RoleGuard roles={roleList(roles.nonConformities)} />,
+                    children: [
+                      {
+                        index: true,
+                        lazy: async () => {
+                          const { NonConformitiesPage } = await import('@/pages/quality/nonconformities-page');
+                          return { Component: NonConformitiesPage };
+                        },
+                      },
+                    ],
                   },
                   {
                     path: 'historial',

@@ -3,19 +3,27 @@ import { findNavItem } from '@/lib/navigation';
 
 const SUBTITLES: Record<string, string> = {
   '/': 'Resumen general del taller, hojas de ruta y carga por área.',
+  '/expedientes': 'Expedientes de taller, campo, proyectos y suministro.',
   '/mis-tareas': 'Fases asignadas a tu área y pendientes por ejecutar.',
   '/aprobaciones': 'Hojas de ruta pendientes de revisión técnica.',
   '/hojas-de-ruta': 'Orquestación de componentes, partes, repuestos y fases.',
   '/hojas-de-ruta/historial': 'Hojas de ruta aprobadas, ejecutadas y entregadas.',
   '/ventas': 'Estado de las hojas de ruta y compromisos de entrega.',
   '/ventas/clientes': 'Cartera de clientes y su actividad reciente.',
+  '/taller': 'Secciones especializadas, carga y expedientes de taller.',
   '/taller/inspecciones': 'Solicitudes y fases de inspección de las áreas.',
   '/taller/repuestos': 'Solicitudes de repuestos para las hojas activas.',
+  '/campo': 'Sitios, permisos, cuadrillas y movilizaciones de campo.',
+  '/proyectos': 'Ingeniería, procura, construcción y comisionamiento.',
+  '/suministro': 'Componentes, proveedores y entregas de suministro.',
   '/almacen/inventario': 'Existencias, ubicaciones y disponibilidad.',
   '/almacen/solicitudes': 'Pedidos de taller e ingeniería pendientes de despacho.',
   '/almacen/prestamos': 'Entregas y devoluciones de herramientas.',
+  '/almacen/calibracion': 'Instrumentos, certificados y vencimientos de calibración.',
   '/calidad/tareas': 'Fases de calidad y evidencias pendientes de revisión.',
   '/calidad/visto-bueno': 'Hojas de ruta pendientes del visto bueno final.',
+  '/calidad/registros': 'Registros NDT, pruebas eléctricas, dimensionales y de balanceo.',
+  '/calidad/no-conformidades': 'Hallazgos, acciones correctivas y cierre.',
   '/calidad/historial': 'Equipos aprobados y listos para entrega.',
   '/analitica/rendimiento': 'Tiempos, carga y productividad por área.',
   '/planta': 'Ubicación física de las hojas de ruta activas.',
@@ -35,6 +43,12 @@ export function usePageMeta(): PageMeta {
     return {
       title: 'Detalle de hoja de ruta',
       subtitle: 'Partes, repuestos, fases, evidencias y auditoría del expediente.',
+    };
+  }
+  if (pathname.startsWith('/expedientes/')) {
+    return {
+      title: 'Detalle del expediente',
+      subtitle: 'Activo, hoja de ruta, calidad, no conformidades y operación.',
     };
   }
   const item = findNavItem(pathname);

@@ -13,7 +13,7 @@ import { ChartCard } from '@/components/charts/chart-card';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { OperationsRadar, type OperationsRadarItem } from '@/components/charts/operations-radar';
 import { SimpleBarChart } from '@/components/charts/simple-bar-chart';
-import { RouteStatusBadge } from '@/components/common/badges';
+import { RouteStatusBadge, ServiceModeBadge, ServiceOrderStatusBadge } from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
 import { ProgressBar } from '@/components/common/progress-bar';
@@ -33,13 +33,15 @@ import {
   getRouteMetrics,
   getRoutesWithRelations,
   getSalesStatusData,
+  getServiceOrderMetrics,
+  getServiceOrdersWithRelations,
   getStatusChartData,
   getUpcomingDeliveries,
   getWarehouseRequests,
 } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { RouteSheetWithRelations } from '@/features/preview/types';
+import type { RouteSheetWithRelations, ServiceOrderWithRelations } from '@/features/preview/types';
 import { daysUntil, formatDate } from '@/lib/formatters';
 import { canManageRoutes } from '@/lib/permissions';
 
@@ -92,6 +94,48 @@ const rolePrompts = {
     action: 'Ver auditoría',
     to: '/administracion/auditoria',
   },
+  FIELD: {
+    title: 'Servicios de campo',
+    description: 'Coordina movilizaciones, permisos, cuadrillas y reportes en sitio.',
+    action: 'Ver campo',
+    to: '/campo',
+  },
+  PROJECT: {
+    title: 'Proyectos electromecánicos',
+    description: 'Sigue ingeniería, procura, construcción y comisionamiento.',
+    action: 'Ver proyectos',
+    to: '/proyectos',
+  },
+  NDT: {
+    title: 'Ensayos no destructivos',
+    description: 'Registra NDT y libera componentes críticos.',
+    action: 'Ver registros',
+    to: '/calidad/registros',
+  },
+  METROLOGY: {
+    title: 'Metrología y calibración',
+    description: 'Controla instrumentos, calibraciones y vencimientos.',
+    action: 'Ver calibración',
+    to: '/almacen/calibracion',
+  },
+  HSE: {
+    title: 'Seguridad y ambiente',
+    description: 'Valida permisos, riesgos y aspectos ambientales de los trabajos.',
+    action: 'Ver campo',
+    to: '/campo',
+  },
+  PROCUREMENT: {
+    title: 'Procura y suministro',
+    description: 'Gestiona compras, proveedores y entregas de componentes.',
+    action: 'Ver suministro',
+    to: '/suministro',
+  },
+  SECTION_CHIEF: {
+    title: 'Jefatura de sección',
+    description: 'Coordina la ejecución de tu sección y la liberación de fases.',
+    action: 'Ver taller',
+    to: '/taller',
+  },
 } as const;
 
 export function DashboardPage() {
@@ -102,6 +146,10 @@ export function DashboardPage() {
   if (!user) return null;
 
   const metrics = getRouteMetrics(db);
+  const serviceMetrics = getServiceOrderMetrics(db);
+  const recentOrders = getServiceOrdersWithRelations(db)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
   const statusData = getStatusChartData(db);
   const areaWorkload = getAreaWorkloadData(db).filter((item) => item.value > 0);
   const topClients = getClientVolumeData(db);
@@ -189,6 +237,44 @@ export function DashboardPage() {
     },
   ];
 
+  const orderColumns: DataTableColumn<ServiceOrderWithRelations>[] = [
+    {
+      id: 'order',
+      header: 'Expediente',
+      cell: (order) => (
+        <div className="min-w-0 space-y-1">
+          <p className="font-medium text-foreground">{order.code}</p>
+          <ServiceModeBadge mode={order.mode} />
+        </div>
+      ),
+      sortable: true,
+      sortValue: (order) => order.code,
+    },
+    {
+      id: 'client',
+      header: 'Cliente / activo',
+      cell: (order) => (
+        <div className="text-xs">
+          <p className="text-foreground">{order.client?.name ?? '—'}</p>
+          <p className="text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model}</p>
+        </div>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
+      hideOnMobile: true,
+    },
+    {
+      id: 'progress',
+      header: 'Avance',
+      cell: (order) => <ProgressBar value={order.progress} className="w-28" />,
+      hideOnMobile: true,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -233,6 +319,39 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <div className="grid gap-4 xl:grid-cols-[0.6fr_1.4fr]">
+        <ChartCard title="Expedientes por modo" description="Taller, campo, proyectos y suministro.">
+          <DonutChart
+            data={[
+              { name: 'Taller', value: serviceMetrics.shop, color: '#00d1ff' },
+              { name: 'Campo', value: serviceMetrics.field, color: '#fb923c' },
+              { name: 'Proyectos', value: serviceMetrics.project, color: '#f472b6' },
+              { name: 'Suministro', value: serviceMetrics.supply, color: '#c084fc' },
+            ]}
+            centerValue={serviceMetrics.total}
+            centerLabel="expedientes"
+            height={260}
+          />
+        </ChartCard>
+        <SectionCard
+          title="Últimos expedientes"
+          description="Actividad reciente de taller, campo, proyectos y suministro."
+          contentClassName="p-0"
+        >
+          <DataTable
+            data={recentOrders}
+            columns={orderColumns}
+            getRowId={(order) => order.id}
+            pageSize={5}
+            pageSizeOptions={[5, 10]}
+            onRowClick={(order) => navigate(`/expedientes/${order.id}`)}
+            emptyTitle="Sin expedientes"
+            emptyDescription="Crea un expediente para comenzar."
+            caption="Últimos expedientes de servicio"
+          />
+        </SectionCard>
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Flujo de hojas de ruta" description="Distribución por estado del ciclo de vida.">

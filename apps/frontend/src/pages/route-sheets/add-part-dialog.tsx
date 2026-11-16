@@ -16,13 +16,13 @@ interface AddPartDialogProps {
 export function AddPartDialog({ open, onOpenChange, onSubmit }: AddPartDialogProps) {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [areas, setAreas] = useState<AreaId[]>(['machining', 'quality']);
+  const [areas, setAreas] = useState<AreaId[]>(['machining_major', 'quality']);
 
   useEffect(() => {
     if (open) {
       setName('');
       setQuantity(1);
-      setAreas(['machining', 'quality']);
+      setAreas(['machining_major', 'quality']);
     }
   }, [open]);
 

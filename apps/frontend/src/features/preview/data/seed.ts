@@ -1,17 +1,26 @@
 import type {
   AreaId,
+  Asset,
   AuditAction,
   AuditEntry,
   Client,
   Component,
+  FieldJob,
   InventoryItem,
   Loan,
   NewPartInput,
+  NonConformity,
   Part,
   Phase,
   PreviewDatabase,
+  Project,
+  QualityRecord,
+  RouteSheet,
   RouteStatus,
+  ServiceOrder,
+  ServiceTemplate,
   SparePart,
+  SupplyOrder,
   User,
 } from '../types';
 
@@ -51,6 +60,13 @@ export const USERS: User[] = [
   { id: 'u-fernando', name: 'Fernando León', username: 'fernando.leon', email: 'fernando@turbopre.com', role: 'OPERATOR', areaId: 'turbines', active: true, createdAt: shiftDays(-180) },
   { id: 'u-marta', name: 'Marta Almacén', username: 'marta.almacen', email: 'marta@turbopre.com', role: 'WAREHOUSE', areaId: 'warehouse', active: true, createdAt: shiftDays(-170) },
   { id: 'u-hector', name: 'Héctor Mendoza', username: 'hector.mendoza', email: 'hector@turbopre.com', role: 'QUALITY', areaId: 'quality', active: true, createdAt: shiftDays(-170) },
+  { id: 'u-camila', name: 'Camila Torres', username: 'camila.torres', email: 'camila@turbopre.com', role: 'FIELD', areaId: 'field_engineering', active: true, createdAt: shiftDays(-160) },
+  { id: 'u-rafael', name: 'Rafael Paredes', username: 'rafael.paredes', email: 'rafael@turbopre.com', role: 'PROJECT', areaId: 'projects', active: true, createdAt: shiftDays(-160) },
+  { id: 'u-elena', name: 'Elena Nava', username: 'elena.nava', email: 'elena@turbopre.com', role: 'NDT', areaId: 'field_engineering', active: true, createdAt: shiftDays(-150) },
+  { id: 'u-jorge', name: 'Jorge Medina', username: 'jorge.medina', email: 'jorge@turbopre.com', role: 'METROLOGY', areaId: 'metrology', active: true, createdAt: shiftDays(-150) },
+  { id: 'u-patricia', name: 'Patricia Silva', username: 'patricia.silva', email: 'patricia@turbopre.com', role: 'HSE', areaId: 'admin', active: true, createdAt: shiftDays(-140) },
+  { id: 'u-giovanny', name: 'Giovanny Castellano', username: 'giovanny.castellano', email: 'giovanny@turbopre.com', role: 'PROCUREMENT', areaId: 'supply', active: true, createdAt: shiftDays(-140) },
+  { id: 'u-ricardo-jefe', name: 'Ricardo Bonilla', username: 'ricardo.jefe', email: 'ricardo.jefe@turbopre.com', role: 'SECTION_CHIEF', areaId: 'assembly', active: true, createdAt: shiftDays(-130) },
 ];
 
 export const CLIENTS: Client[] = [
@@ -75,6 +91,21 @@ export const COMPONENTS: Component[] = [
   { id: 'comp-10', name: 'Generador Eléctrico G-250', serial: 'GE-250-17', type: 'Eléctrico' },
   { id: 'comp-11', name: 'Buje de Bronce', serial: 'BB-4408', type: 'Fricción' },
   { id: 'comp-12', name: 'Volante de Inercia', serial: 'VI-8812', type: 'Rotativo' },
+];
+
+export const ASSETS: Asset[] = [
+  { id: 'asset-1', clientId: 'cli-1', type: 'GAS_TURBINE', manufacturer: 'Siemens', model: 'W501 FD3', serial: 'W501-8842', tag: 'GT-101', ratedPower: '180 MW', technology: 'Gas / W501', location: 'Planta Maracaibo' },
+  { id: 'asset-2', clientId: 'cli-2', type: 'GAS_TURBINE', manufacturer: 'Rolls Royce', model: 'Avon', serial: 'AVON-5510', tag: 'GT-204', ratedPower: 'Gas', technology: 'Avon', location: 'PetroPiar' },
+  { id: 'asset-3', clientId: 'cli-5', type: 'GAS_TURBINE', manufacturer: 'Elliot', model: 'TG-500', serial: 'ELL-3301', tag: 'GT-305', ratedPower: 'Gas', technology: 'Elliot', location: 'Carbones del Zulia' },
+  { id: 'asset-4', clientId: 'cli-4', type: 'GAS_TURBINE', manufacturer: 'General Electric', model: '7E', serial: 'GE7E-7721', tag: 'GT-410', ratedPower: '85 MW', technology: 'MS 5001 / 7E', location: 'Ferrominera' },
+  { id: 'asset-5', clientId: 'cli-6', type: 'STEAM_TURBINE', manufacturer: 'Siemens', model: 'SST-600', serial: 'SST-600-19', tag: 'ST-501', ratedPower: '400 MW', technology: 'Vapor', location: 'Complejo Industrial' },
+  { id: 'asset-6', clientId: 'cli-3', type: 'STEAM_TURBINE', manufacturer: 'General Electric', model: 'ST-300', serial: 'ST300-118', tag: 'ST-602', ratedPower: '150 MW', technology: 'Vapor', location: 'Cementos Caribe' },
+  { id: 'asset-7', clientId: 'cli-1', type: 'GENERATOR', manufacturer: 'General Electric', model: '7FH2', serial: '7FH2-4451', tag: 'GEN-701', ratedPower: '450 MW', technology: 'Generador', location: 'PDVSA Refinación' },
+  { id: 'asset-8', clientId: 'cli-2', type: 'GENERATOR', manufacturer: 'Siemens', model: 'SGen-3000W', serial: 'SG-3000-88', tag: 'GEN-702', ratedPower: '250 MW', technology: 'Generador', location: 'PetroPiar' },
+  { id: 'asset-9', clientId: 'cli-3', type: 'COMPRESSOR', manufacturer: 'Siemens', model: 'STC-SV', serial: 'STC-8812', tag: 'K-801', ratedPower: 'Compresión', technology: 'Centrífugo', location: 'Cementos Caribe' },
+  { id: 'asset-10', clientId: 'cli-1', type: 'CONTROL_SYSTEM', manufacturer: 'General Electric', model: 'Mark VIe', serial: 'MKVIE-2026', tag: 'CS-901', ratedPower: 'Control', technology: 'Mark VIe', location: 'PDVSA Refinación' },
+  { id: 'asset-11', clientId: 'cli-6', type: 'GAS_TURBINE', manufacturer: 'General Electric', model: '7FA', serial: 'GE7FA-6620', tag: 'GT-411', ratedPower: '170 MW', technology: '7FA', location: 'Servicios Petroleros Andinos' },
+  { id: 'asset-12', clientId: 'cli-5', type: 'STEAM_TURBINE', manufacturer: 'Elliot', model: 'ST-250', serial: 'ELL-250-77', tag: 'ST-603', ratedPower: '120 MW', technology: 'Vapor', location: 'Carbones del Zulia' },
 ];
 
 interface RouteSeed {
@@ -223,6 +254,140 @@ const ROUTE_SEEDS: RouteSeed[] = [
   },
 ];
 
+export const SERVICE_TEMPLATES: ServiceTemplate[] = [
+  {
+    id: 'tpl-gas-combustion',
+    name: 'Inspección de combustión · Turbina a gas',
+    mode: 'FIELD',
+    scope: 'COMBUSTION_INSPECTION',
+    description: 'Inspección visual remota, revisión de combustión y sustitución de componentes según hallazgos.',
+    items: [
+      { areaId: 'field_engineering', name: 'Inspección visual remota (videoscopia)', type: 'INSPECTION', qualityType: 'VISUAL' },
+      { areaId: 'field_gas', name: 'Inspección de combustión y componentes', type: 'WORK', requiresDocument: 'Reporte de combustión' },
+      { areaId: 'field_engineering', name: 'NDT de componentes críticos', type: 'INSPECTION', qualityType: 'NDT', requiresDocument: 'Reporte NDT' },
+      { areaId: 'quality', name: 'Liberación de calidad', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-gas-hot-path',
+    name: 'Paso de gases calientes · Turbina a gas',
+    mode: 'SHOP',
+    scope: 'HOT_GAS_PATH',
+    description: 'Sustitución de cestos, inyectores, piezas de transición, álabes y toberas.',
+    items: [
+      { areaId: 'assembly', name: 'Desensamble y preparación', type: 'WORK' },
+      { areaId: 'special_welding', name: 'Reparación de componentes de combustión', type: 'WORK' },
+      { areaId: 'thermal_coatings', name: 'Recubrimiento TBC', type: 'WORK', qualityType: 'COATING', requiresDocument: 'Certificado de recubrimiento' },
+      { areaId: 'machining_major', name: 'Mecanizado y ajuste', type: 'WORK' },
+      { areaId: 'balancing', name: 'Balanceo de rotor', type: 'WORK', qualityType: 'BALANCE', requiresDocument: 'Reporte de balanceo' },
+      { areaId: 'quality', name: 'Liberación de calidad', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-gas-major',
+    name: 'Mantenimiento mayor · Turbina a gas',
+    mode: 'SHOP',
+    scope: 'MAJOR_OVERHAUL',
+    description: 'Intervención integral de componentes estáticos y dinámicos, incluyendo rotor y control.',
+    items: [
+      { areaId: 'assembly', name: 'Desensamble mayor', type: 'WORK' },
+      { areaId: 'machining_major', name: 'Mecanizado de rotores y carcasas', type: 'WORK' },
+      { areaId: 'special_welding', name: 'Soldadura especial', type: 'WORK' },
+      { areaId: 'thermal_coatings', name: 'Tratamiento térmico y recubrimientos', type: 'WORK', qualityType: 'HEAT_TREATMENT' },
+      { areaId: 'balancing', name: 'Balanceo de baja velocidad', type: 'WORK', qualityType: 'BALANCE' },
+      { areaId: 'quality', name: 'Pruebas y liberación final', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-steam-rotor',
+    name: 'Reparación de rotor · Turbina a vapor',
+    mode: 'SHOP',
+    scope: 'STEAM_ROTOR_REPAIR',
+    description: 'Enderezamiento, álabes, muñones, discos, sellos, balanceo y mecanizado.',
+    items: [
+      { areaId: 'field_steam', name: 'Inspección NDT en sitio', type: 'INSPECTION', qualityType: 'NDT' },
+      { areaId: 'assembly', name: 'Extracción y desensamble del rotor', type: 'WORK' },
+      { areaId: 'machining_major', name: 'Mecanizado de muñones y sellos', type: 'WORK' },
+      { areaId: 'special_welding', name: 'Reparación por soldadura', type: 'WORK' },
+      { areaId: 'balancing', name: 'Balanceo del rotor', type: 'WORK', qualityType: 'BALANCE' },
+      { areaId: 'quality', name: 'Liberación dimensional y final', type: 'QUALITY', qualityType: 'DIMENSIONAL' },
+    ],
+  },
+  {
+    id: 'tpl-generator-stator',
+    name: 'Mantenimiento de estator · Generador',
+    mode: 'SHOP',
+    scope: 'GENERATOR_STATOR',
+    description: 'Limpieza, inspección, recubrimiento y pruebas eléctricas del estator.',
+    items: [
+      { areaId: 'generator_shop', name: 'Limpieza y recubrimiento glyptal', type: 'WORK' },
+      { areaId: 'thermal_coatings', name: 'Tratamiento de secado', type: 'WORK', qualityType: 'HEAT_TREATMENT' },
+      { areaId: 'quality', name: 'Pruebas eléctricas del estator', type: 'QUALITY', qualityType: 'ELECTRICAL', requiresDocument: 'Reporte eléctrico' },
+    ],
+  },
+  {
+    id: 'tpl-generator-rewind',
+    name: 'Rebobinado de estator · Generador',
+    mode: 'SHOP',
+    scope: 'GENERATOR_REWIND',
+    description: 'Retiro de bobinas, fabricación, instalación, curado y pruebas finales.',
+    items: [
+      { areaId: 'generator_shop', name: 'Retiro de cuñas y bobinas', type: 'WORK' },
+      { areaId: 'generator_shop', name: 'Fabricación e instalación de bobinas', type: 'WORK' },
+      { areaId: 'thermal_coatings', name: 'Curado, resina y secado', type: 'WORK', qualityType: 'HEAT_TREATMENT' },
+      { areaId: 'quality', name: 'Pruebas eléctricas finales', type: 'QUALITY', qualityType: 'ELECTRICAL', requiresDocument: 'Certificado de pruebas' },
+    ],
+  },
+  {
+    id: 'tpl-shop-balancing',
+    name: 'Balanceo dinámico',
+    mode: 'SHOP',
+    scope: 'SHOP_BALANCING',
+    description: 'Balanceo de baja velocidad hasta 800 RPM.',
+    items: [
+      { areaId: 'balancing', name: 'Montaje y balanceo', type: 'WORK', qualityType: 'BALANCE', requiresDocument: 'Reporte de balanceo' },
+      { areaId: 'quality', name: 'Verificación final', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-ndt',
+    name: 'Ensayos no destructivos',
+    mode: 'FIELD',
+    scope: 'NDT',
+    description: 'VT, PT, MT, UT, Phased Array, Eddy Current y monitoreo de condiciones.',
+    items: [
+      { areaId: 'field_engineering', name: 'Preparación y acceso', type: 'WORK' },
+      { areaId: 'field_engineering', name: 'Ensayo NDT', type: 'INSPECTION', qualityType: 'NDT', requiresDocument: 'Reporte NDT' },
+      { areaId: 'quality', name: 'Revisión de resultados', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-project',
+    name: 'Proyecto electromecánico',
+    mode: 'PROJECT',
+    scope: 'FIELD_PROJECT',
+    description: 'Ingeniería, procura, construcción, precomisionamiento y comisionamiento.',
+    items: [
+      { areaId: 'projects', name: 'Ingeniería básica y de detalle', type: 'WORK', requiresDocument: 'Memoria de cálculo' },
+      { areaId: 'projects', name: 'Procura nacional e internacional', type: 'WORK' },
+      { areaId: 'projects', name: 'Construcción y montaje', type: 'WORK' },
+      { areaId: 'projects', name: 'Precomisionamiento y comisionamiento', type: 'INSPECTION', qualityType: 'FINAL' },
+      { areaId: 'quality', name: 'Cierre y aceptación', type: 'QUALITY', qualityType: 'FINAL' },
+    ],
+  },
+  {
+    id: 'tpl-supply',
+    name: 'Suministro de componentes',
+    mode: 'SUPPLY',
+    scope: 'SUPPLY_COMPONENTS',
+    description: 'Cotización, compra o fabricación, inspección y despacho de componentes.',
+    items: [
+      { areaId: 'supply', name: 'Cotización y procura', type: 'WORK' },
+      { areaId: 'quality', name: 'Inspección de recepción', type: 'INSPECTION', qualityType: 'VISUAL' },
+      { areaId: 'material_warehouse', name: 'Despacho y entrega', type: 'WORK' },
+    ],
+  },
+];
 const AREA_USER: Record<string, string | undefined> = {
   planning: 'u-carlos',
   engineering: 'u-luis',
@@ -234,6 +399,22 @@ const AREA_USER: Record<string, string | undefined> = {
   warehouse: 'u-juan',
   quality: 'u-valentina',
   sales: 'u-maria',
+  assembly: 'u-ricardo-jefe',
+  machining_major: 'u-andres',
+  machining_minor: 'u-daniella',
+  balancing: 'u-pedro',
+  special_welding: 'u-jose',
+  generator_shop: 'u-jhon',
+  thermal_coatings: 'u-miguel',
+  metrology: 'u-jorge',
+  material_warehouse: 'u-marta',
+  admin: 'u-ana',
+  field_gas: 'u-camila',
+  field_steam: 'u-camila',
+  field_generator: 'u-camila',
+  field_engineering: 'u-elena',
+  projects: 'u-rafael',
+  supply: 'u-giovanny',
 };
 
 const AREA_PHASE_NAME: Record<string, string> = {
@@ -247,11 +428,27 @@ const AREA_PHASE_NAME: Record<string, string> = {
   quality: 'Liberación de calidad',
   warehouse: 'Preparación de materiales',
   sales: 'Confirmación con el cliente',
+  assembly: 'Izamiento, desensamble y ensamble',
+  machining_major: 'Mecanizado mayor y recuperación',
+  machining_minor: 'Mecanizado menor y ajuste',
+  balancing: 'Balanceo dinámico a baja velocidad',
+  special_welding: 'Soldadura especial certificada',
+  generator_shop: 'Mantenimiento de generador',
+  thermal_coatings: 'Tratamiento térmico y recubrimientos',
+  metrology: 'Verificación y calibración',
+  material_warehouse: 'Preparación y despacho de materiales',
+  admin: 'Revisión administrativa',
+  field_gas: 'Servicio de campo en turbina a gas',
+  field_steam: 'Servicio de campo en turbina a vapor',
+  field_generator: 'Servicio de campo en generador',
+  field_engineering: 'Inspección NDT y monitoreo de condiciones',
+  projects: 'Etapa de proyecto electromecánico',
+  supply: 'Gestión de suministro',
 };
 
 function phaseTypeForArea(areaId: AreaId): Phase['type'] {
   if (areaId === 'quality') return 'QUALITY';
-  if (areaId === 'workshop') return 'INSPECTION';
+  if (['workshop', 'field_engineering', 'metrology'].includes(areaId)) return 'INSPECTION';
   return 'WORK';
 }
 
@@ -277,6 +474,278 @@ function buildPhaseStatus(
   if (phaseIndex < completedCount) return 'COMPLETED';
   if (phaseIndex === completedCount) return 'IN_PROGRESS';
   return 'BLOCKED';
+}
+
+export const SERVICE_ORDERS: ServiceOrder[] = [
+  {
+    id: 'so-001', code: 'EXP-2026-001', mode: 'SHOP', status: 'IN_EXECUTION', clientId: 'cli-1', assetId: 'asset-1',
+    site: 'Refinería Maracaibo', scope: 'HOT_GAS_PATH',
+    description: 'Inspección de paso de gases calientes y recuperación de componentes de combustión.',
+    priority: 'CRITICAL', createdAt: shiftDays(-18), dueDate: shiftDays(8), createdBy: 'u-carlos', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-15), routeSheetId: 'route-001',
+  },
+  {
+    id: 'so-002', code: 'EXP-2026-002', mode: 'SHOP', status: 'IN_QUALITY', clientId: 'cli-1', assetId: 'asset-7',
+    site: 'PDVSA Refinación', scope: 'GENERATOR_REWIND',
+    description: 'Rebobinado de estator y pruebas eléctricas finales del generador GE 7FH2.',
+    priority: 'HIGH', createdAt: shiftDays(-25), dueDate: shiftDays(3), createdBy: 'u-carlos', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-22), routeSheetId: 'route-005',
+  },
+  {
+    id: 'so-003', code: 'EXP-2026-003', mode: 'SHOP', status: 'APPROVED', clientId: 'cli-5', assetId: 'asset-3',
+    site: 'Carbones del Zulia', scope: 'STEAM_ROTOR_REPAIR',
+    description: 'Reparación de rotor de turbina a vapor: muñones, sellos, álabes y balanceo.',
+    priority: 'HIGH', createdAt: shiftDays(-20), dueDate: shiftDays(12), createdBy: 'u-carlos', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-17), routeSheetId: 'route-004',
+  },
+  {
+    id: 'so-004', code: 'EXP-2026-004', mode: 'FIELD', status: 'IN_EXECUTION', clientId: 'cli-2', assetId: 'asset-2',
+    site: 'PetroPiar · Jusepín', scope: 'COMBUSTION_INSPECTION',
+    description: 'Inspección de combustión en turbina Rolls Royce Avon con videoscopia y NDT.',
+    priority: 'HIGH', createdAt: shiftDays(-8), dueDate: shiftDays(5), createdBy: 'u-carlos', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-6),
+  },
+  {
+    id: 'so-005', code: 'EXP-2026-005', mode: 'FIELD', status: 'PLANNING', clientId: 'cli-6', assetId: 'asset-5',
+    site: 'Complejo Industrial', scope: 'STEAM_ROTOR_REPAIR',
+    description: 'Inspección NDT en sitio y preparación para extracción de rotor de turbina a vapor.',
+    priority: 'MEDIUM', createdAt: shiftDays(-3), dueDate: shiftDays(18), createdBy: 'u-carlos',
+  },
+  {
+    id: 'so-006', code: 'EXP-2026-006', mode: 'FIELD', status: 'READY_FOR_DELIVERY', clientId: 'cli-2', assetId: 'asset-8',
+    site: 'PetroPiar', scope: 'GENERATOR_STATOR',
+    description: 'Mantenimiento de estator, secado y pruebas eléctricas en sitio.',
+    priority: 'MEDIUM', createdAt: shiftDays(-30), dueDate: shiftDays(-2), createdBy: 'u-carlos', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-27),
+  },
+  {
+    id: 'so-007', code: 'EXP-2026-007', mode: 'PROJECT', status: 'PLANNING', clientId: 'cli-4', assetId: 'asset-4',
+    site: 'Ferrominera Orinoco', scope: 'FIELD_PROJECT',
+    description: 'Repotenciación de turbina GE 7E: ingeniería, procura y montaje electromecánico.',
+    priority: 'HIGH', createdAt: shiftDays(-15), dueDate: shiftDays(45), createdBy: 'u-rafael',
+  },
+  {
+    id: 'so-008', code: 'EXP-2026-008', mode: 'PROJECT', status: 'IN_EXECUTION', clientId: 'cli-1', assetId: 'asset-11',
+    site: 'PDVSA Refinación', scope: 'FIELD_PROJECT',
+    description: 'Montaje electromecánico y balance de planta para turbina GE 7FA.',
+    priority: 'CRITICAL', createdAt: shiftDays(-40), dueDate: shiftDays(20), createdBy: 'u-rafael', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-35),
+  },
+  {
+    id: 'so-009', code: 'EXP-2026-009', mode: 'SUPPLY', status: 'IN_EXECUTION', clientId: 'cli-1', assetId: 'asset-1',
+    site: 'PDVSA Refinación', scope: 'SUPPLY_COMPONENTS',
+    description: 'Suministro de álabes, cestos combustores e inyectores para Siemens W501 FD3.',
+    priority: 'HIGH', createdAt: shiftDays(-5), dueDate: shiftDays(15), createdBy: 'u-giovanny',
+  },
+  {
+    id: 'so-010', code: 'EXP-2026-010', mode: 'SUPPLY', status: 'DELIVERED', clientId: 'cli-6', assetId: 'asset-9',
+    site: 'Servicios Petroleros Andinos', scope: 'SUPPLY_CONTROL_SYSTEMS',
+    description: 'Suministro e instalación de sistema de control y monitoreo para compresor centrífugo.',
+    priority: 'MEDIUM', createdAt: shiftDays(-30), dueDate: shiftDays(-5), createdBy: 'u-giovanny', approvedBy: 'u-luis',
+    approvedAt: shiftDays(-28),
+  },
+  {
+    id: 'so-011', code: 'EXP-2026-011', mode: 'SHOP', status: 'DIAGNOSIS', clientId: 'cli-3', assetId: 'asset-9',
+    site: 'Cementos Caribe', scope: 'SHOP_BALANCING',
+    description: 'Diagnóstico y balanceo dinámico de rotor de compresor centrífugo.',
+    priority: 'MEDIUM', createdAt: shiftDays(-2), dueDate: shiftDays(14), createdBy: 'u-carlos',
+  },
+  {
+    id: 'so-012', code: 'EXP-2026-012', mode: 'FIELD', status: 'DIAGNOSIS', clientId: 'cli-3', assetId: 'asset-6',
+    site: 'Cementos Caribe', scope: 'NDT',
+    description: 'Ensayos no destructivos y monitoreo de condiciones en turbina a vapor.',
+    priority: 'MEDIUM', createdAt: shiftDays(-1), dueDate: shiftDays(10), createdBy: 'u-elena',
+  },
+];
+
+export const FIELD_JOBS: FieldJob[] = [
+  {
+    id: 'field-1', serviceOrderId: 'so-004', siteName: 'PetroPiar · Jusepín', location: 'Jusepín, Monagas',
+    permits: 'Permiso de trabajo en caliente PT-2026-045', riskAnalysis: 'AST-2026-045 aprobado',
+    crew: ['Pedro Salas', 'José Gómez', 'Elena Nava'], mobilizationDate: shiftDays(-6), containers: 2,
+    cranes: 'Grúa telescópica 150 t', status: 'IN_EXECUTION', report: 'Inspección de combustión en curso. Componentes de transición con desgaste leve.',
+  },
+  {
+    id: 'field-2', serviceOrderId: 'so-005', siteName: 'Complejo Industrial', location: 'Maracaibo, Zulia',
+    permits: 'Pendiente permiso de acceso', riskAnalysis: 'AST preliminar', crew: ['Camila Torres', 'Elena Nava'],
+    containers: 1, cranes: 'Por definir', status: 'PLANNED',
+  },
+  {
+    id: 'field-3', serviceOrderId: 'so-006', siteName: 'PetroPiar', location: 'Puerto La Cruz, Anzoátegui',
+    permits: 'PT-2026-031', riskAnalysis: 'AST-2026-031', crew: ['Camila Torres', 'Jhon Ramírez'],
+    mobilizationDate: shiftDays(-28), demobilizationDate: shiftDays(-4), containers: 2, cranes: 'Grúa 50 t',
+    status: 'DEMOBILIZED', report: 'Pruebas eléctricas completadas. Pendiente aceptación del cliente.',
+  },
+  {
+    id: 'field-4', serviceOrderId: 'so-012', siteName: 'Cementos Caribe', location: 'Maracaibo, Zulia',
+    permits: 'PT-2026-052', riskAnalysis: 'AST-2026-052', crew: ['Elena Nava'], mobilizationDate: shiftDays(-1),
+    containers: 1, cranes: 'No aplica', status: 'MOBILIZED', report: 'Levantamiento NDT inicial.',
+  },
+];
+
+export const PROJECTS: Project[] = [
+  {
+    id: 'project-1', serviceOrderId: 'so-007', name: 'Repotenciación GE 7E', phase: 'ENGINEERING', progress: 25,
+    milestones: [
+      { id: 'pm-1', name: 'Ingeniería básica', phase: 'ENGINEERING', status: 'COMPLETED', date: shiftDays(-10) },
+      { id: 'pm-2', name: 'Ingeniería de detalle', phase: 'ENGINEERING', status: 'IN_PROGRESS', date: shiftDays(5) },
+      { id: 'pm-3', name: 'Procura de equipos', phase: 'PROCUREMENT', status: 'PENDING' },
+      { id: 'pm-4', name: 'Montaje electromecánico', phase: 'CONSTRUCTION', status: 'PENDING' },
+      { id: 'pm-5', name: 'Comisionamiento', phase: 'COMMISSIONING', status: 'PENDING' },
+    ],
+  },
+  {
+    id: 'project-2', serviceOrderId: 'so-008', name: 'Montaje GE 7FA', phase: 'CONSTRUCTION', progress: 60,
+    milestones: [
+      { id: 'pm-6', name: 'Ingeniería y procura', phase: 'ENGINEERING', status: 'COMPLETED', date: shiftDays(-30) },
+      { id: 'pm-7', name: 'Obras preliminares', phase: 'CONSTRUCTION', status: 'COMPLETED', date: shiftDays(-20) },
+      { id: 'pm-8', name: 'Montaje de turbogenerador', phase: 'CONSTRUCTION', status: 'IN_PROGRESS', date: shiftDays(10) },
+      { id: 'pm-9', name: 'Precomisionamiento', phase: 'PRECOMMISSIONING', status: 'PENDING' },
+      { id: 'pm-10', name: 'Comisionamiento', phase: 'COMMISSIONING', status: 'PENDING' },
+    ],
+  },
+];
+
+export const SUPPLY_ORDERS: SupplyOrder[] = [
+  {
+    id: 'supply-1', serviceOrderId: 'so-009', status: 'PURCHASED', supplier: 'Siemens Energy',
+    purchaseOrder: 'PO-2026-0088', expectedDate: shiftDays(10),
+    items: [
+      { id: 'si-1', name: 'Álabes de turbina', code: 'AL-W501', quantity: 6, status: 'PURCHASED' },
+      { id: 'si-2', name: 'Cestos combustores', code: 'CC-W501', quantity: 4, status: 'PURCHASED' },
+      { id: 'si-3', name: 'Inyectores de combustible', code: 'IN-W501', quantity: 8, status: 'REQUESTED' },
+    ],
+  },
+  {
+    id: 'supply-2', serviceOrderId: 'so-010', status: 'DELIVERED', supplier: 'GE Vernova',
+    purchaseOrder: 'PO-2026-0044', expectedDate: shiftDays(-8), deliveredAt: shiftDays(-5),
+    items: [
+      { id: 'si-4', name: 'Módulo de control Mark VIe', code: 'MKVIE-01', quantity: 1, status: 'DELIVERED' },
+      { id: 'si-5', name: 'Sensores de vibración', code: 'SV-220', quantity: 8, status: 'DELIVERED' },
+    ],
+  },
+];
+
+export const QUALITY_RECORDS: QualityRecord[] = [
+  { id: 'qr-1', serviceOrderId: 'so-001', routeSheetId: 'route-001', type: 'NDT', method: 'Ultrasonido', standard: 'ASME V', acceptanceCriteria: 'Sin indicaciones mayores a 2 mm', result: 'PASS', inspectorId: 'u-elena', certificate: 'NDT-2026-045', testedAt: shiftDays(-5), notes: 'Componentes de combustión conformes.' },
+  { id: 'qr-2', serviceOrderId: 'so-001', routeSheetId: 'route-001', type: 'BALANCE', method: 'Balanceo baja velocidad', standard: 'ISO 1940', acceptanceCriteria: 'Grado G2.5', result: 'PENDING', inspectorId: 'u-pedro' },
+  { id: 'qr-3', serviceOrderId: 'so-002', routeSheetId: 'route-005', type: 'ELECTRICAL', method: 'IR / HI-POT / EL CID', standard: 'IEEE 43', acceptanceCriteria: 'IR > 100 MΩ', result: 'PASS', inspectorId: 'u-valentina', certificate: 'EL-2026-018', testedAt: shiftDays(-4) },
+  { id: 'qr-4', serviceOrderId: 'so-003', routeSheetId: 'route-004', type: 'NDT', method: 'Tintes penetrantes', standard: 'ASME V', acceptanceCriteria: 'Sin grietas', result: 'PASS', inspectorId: 'u-elena', certificate: 'NDT-2026-041', testedAt: shiftDays(-8) },
+  { id: 'qr-5', serviceOrderId: 'so-006', type: 'ELECTRICAL', method: 'Resistencia de aislamiento', standard: 'IEEE 43', acceptanceCriteria: 'IR > 100 MΩ', result: 'PASS', inspectorId: 'u-valentina', certificate: 'EL-2026-021', testedAt: shiftDays(-5) },
+  { id: 'qr-6', serviceOrderId: 'so-005', type: 'NDT', method: 'Partículas magnéticas', standard: 'ASME V', acceptanceCriteria: 'Sin indicaciones', result: 'FAIL', inspectorId: 'u-elena', testedAt: shiftDays(-2), notes: 'Fisura detectada en álabe de primera etapa.' },
+  { id: 'qr-7', serviceOrderId: 'so-004', type: 'VISUAL', method: 'Videoscopia', standard: 'Procedimiento interno', acceptanceCriteria: 'Sin daño crítico', result: 'PASS', inspectorId: 'u-elena', testedAt: shiftDays(-3) },
+  { id: 'qr-8', serviceOrderId: 'so-008', type: 'DIMENSIONAL', method: 'Control dimensional', standard: 'Plan de montaje', acceptanceCriteria: 'Tolerancias de alineación', result: 'PENDING', inspectorId: 'u-jorge' },
+  { id: 'qr-9', serviceOrderId: 'so-011', type: 'BALANCE', method: 'Balanceo dinámico', standard: 'ISO 1940', acceptanceCriteria: 'Grado G2.5', result: 'PENDING', inspectorId: 'u-pedro' },
+  { id: 'qr-10', serviceOrderId: 'so-009', type: 'VISUAL', method: 'Inspección de recepción', standard: 'Certificado de material', acceptanceCriteria: 'Sin daños y certificados completos', result: 'PENDING', inspectorId: 'u-valentina' },
+];
+
+export const NON_CONFORMITIES: NonConformity[] = [
+  { id: 'nc-1', serviceOrderId: 'so-005', description: 'Fisura detectada en álabe de primera etapa durante NDT.', severity: 'HIGH', status: 'OPEN', correctiveAction: 'Evaluar reparación por soldadura o sustitución del álabe.', responsibleId: 'u-camila', createdAt: shiftDays(-2) },
+  { id: 'nc-2', serviceOrderId: 'so-001', description: 'Porosidad en soldadura de carcasa.', severity: 'MEDIUM', status: 'IN_PROGRESS', correctiveAction: 'Reprocesar soldadura y repetir PT.', responsibleId: 'u-jose', createdAt: shiftDays(-6) },
+  { id: 'nc-3', serviceOrderId: 'so-002', description: 'Resistencia de aislamiento por debajo del criterio en fase inicial.', severity: 'HIGH', status: 'IN_PROGRESS', correctiveAction: 'Repetir secado y pruebas eléctricas.', responsibleId: 'u-valentina', createdAt: shiftDays(-3) },
+  { id: 'nc-4', serviceOrderId: 'so-004', description: 'Falta certificado de material de componente de transición.', severity: 'LOW', status: 'CLOSED', correctiveAction: 'Se recibió certificado del proveedor.', responsibleId: 'u-giovanny', createdAt: shiftDays(-7), closedAt: shiftDays(-5) },
+];
+
+function buildServiceOrderRouteSheet(
+  order: ServiceOrder,
+  index: number,
+  template: ServiceTemplate,
+  components: Component[],
+): { routeSheet: RouteSheet; part: Part; phases: Phase[] } {
+  const asset = ASSETS.find((item) => item.id === order.assetId);
+  const componentId = asset ? `comp-${asset.id}` : components[0]?.id ?? 'comp-1';
+  const routeId = `route-${order.id}`;
+  const partId = `part-${order.id}`;
+  const now = new Date().toISOString();
+  const routeStatus: RouteStatus =
+    order.status === 'IN_EXECUTION'
+      ? 'IN_PROGRESS'
+      : order.status === 'IN_QUALITY'
+        ? 'IN_QUALITY'
+        : order.status === 'READY_FOR_DELIVERY'
+          ? 'READY_FOR_DELIVERY'
+          : ['DELIVERED', 'CLOSED'].includes(order.status)
+            ? 'DELIVERED'
+            : order.status === 'APPROVED'
+              ? 'APPROVED'
+              : 'DRAFT';
+
+  const phases: Phase[] = template.items.map((item, phaseIndex) => {
+    const completed =
+      ['READY_FOR_DELIVERY', 'DELIVERED', 'CLOSED'].includes(order.status) ||
+      (order.status === 'IN_QUALITY' && item.type !== 'QUALITY') ||
+      (order.status === 'IN_EXECUTION' && phaseIndex === 0);
+    const inProgress =
+      !completed &&
+      ((order.status === 'IN_EXECUTION' && phaseIndex === 1) ||
+        (order.status === 'IN_QUALITY' && item.type === 'QUALITY'));
+    const status = completed
+      ? 'COMPLETED'
+      : inProgress
+        ? 'IN_PROGRESS'
+        : phaseIndex === 0
+          ? 'PENDING'
+          : 'BLOCKED';
+    const completedAt = completed ? shiftFrom(order.createdAt, Math.max(1, phaseIndex + 1)) : undefined;
+    return {
+      id: `phase-${order.id}-${phaseIndex + 1}`,
+      routeSheetId: routeId,
+      partId,
+      areaId: item.areaId,
+      order: (phaseIndex + 1) * 10,
+      name: item.name,
+      description: item.requiresDocument
+        ? `${item.name}. Documento requerido: ${item.requiresDocument}.`
+        : item.name,
+      type: item.type,
+      status,
+      responsibleId: USERS.find((user) => user.areaId === item.areaId && user.active)?.id,
+      startedAt: completed || inProgress ? shiftFrom(order.createdAt, Math.max(0, phaseIndex)) : undefined,
+      completedAt,
+      observations: completed ? 'Registro de demostración del proceso.' : undefined,
+      evidence: completed ? EVIDENCE_PLACEHOLDER : undefined,
+    };
+  });
+
+  const partCompleted = phases.every((phase) => phase.status === 'COMPLETED');
+  const partStarted = phases.some((phase) => phase.status === 'COMPLETED' || phase.status === 'IN_PROGRESS');
+  const currentPhase =
+    phases.find((phase) => phase.status === 'IN_PROGRESS') ??
+    phases.find((phase) => phase.status === 'PENDING') ??
+    phases[phases.length - 1];
+
+  const part: Part = {
+    id: partId,
+    routeSheetId: routeId,
+    name: asset ? `${asset.manufacturer} ${asset.model} · ${template.name}` : template.name,
+    quantity: 1,
+    status: partCompleted ? 'COMPLETED' : partStarted ? 'IN_PROGRESS' : 'PENDING',
+    areaId: currentPhase?.areaId ?? template.items[0]?.areaId ?? 'workshop',
+  };
+
+  return {
+    routeSheet: {
+      id: routeId,
+      code: `HR-2026-${String(16 + index).padStart(3, '0')}`,
+      componentId,
+      clientId: order.clientId,
+      serviceOrderId: order.id,
+      templateId: template.id,
+      description: order.description,
+      status: routeStatus,
+      priority: order.priority,
+      createdAt: order.createdAt,
+      updatedAt: now,
+      dueDate: order.dueDate,
+      createdBy: order.createdBy,
+      approvedBy: order.approvedBy,
+      approvedAt: order.approvedAt,
+      deliveredAt: ['DELIVERED', 'CLOSED'].includes(order.status) ? shiftFrom(order.dueDate, -1) : undefined,
+      observations: order.observations,
+    },
+    part,
+    phases,
+  };
 }
 
 export function seedDatabase(): PreviewDatabase {
@@ -398,17 +867,49 @@ export function seedDatabase(): PreviewDatabase {
     return route;
   });
 
+  const components: Component[] = [
+    ...COMPONENTS,
+    ...ASSETS.map((asset) => ({
+      id: `comp-${asset.id}`,
+      name: `${asset.manufacturer} ${asset.model}`,
+      serial: asset.serial,
+      type: asset.type,
+    })),
+  ];
+
+  const serviceRouteSheets: RouteSheet[] = [];
+  const serviceParts: Part[] = [];
+  const servicePhases: Phase[] = [];
+  const serviceOrders: ServiceOrder[] = SERVICE_ORDERS.map((order, index) => {
+    const template =
+      SERVICE_TEMPLATES.find((item) => item.scope === order.scope) ??
+      SERVICE_TEMPLATES.find((item) => item.mode === order.mode);
+    if (!template) return order;
+    const generated = buildServiceOrderRouteSheet(order, index, template, components);
+    serviceRouteSheets.push(generated.routeSheet);
+    serviceParts.push(generated.part);
+    servicePhases.push(...generated.phases);
+    return { ...order, routeSheetId: generated.routeSheet.id };
+  });
+
+  const allRouteSheets = [...routeSheets, ...serviceRouteSheets];
+  const allParts = [...parts, ...serviceParts];
+  const allPhases = [...phases, ...servicePhases];
+
   const inventory: InventoryItem[] = [
-    { id: 'inv-1', name: 'Rodamiento SKF 6205', code: 'RD-1001', category: 'Mecánica', quantity: 12, status: 'AVAILABLE', location: 'Estante A-1' },
-    { id: 'inv-2', name: 'Sello mecánico 2"', code: 'SM-2024', category: 'Hidráulica', quantity: 4, status: 'AVAILABLE', location: 'Estante B-2' },
-    { id: 'inv-3', name: 'Válvula neumática 1/2', code: 'VN-5050', category: 'Neumática', quantity: 7, status: 'AVAILABLE', location: 'Estante C-1' },
-    { id: 'inv-4', name: 'Cable eléctrico 12 AWG', code: 'CE-8080', category: 'Eléctrica', quantity: 120, status: 'AVAILABLE', location: 'Estante D-4' },
-    { id: 'inv-5', name: 'Llave de torque 1"', code: 'LT-9090', category: 'Manual', quantity: 2, status: 'LOANED', location: 'Herramientas' },
-    { id: 'inv-6', name: 'Electrodo E7018', code: 'EL-7018', category: 'Soldadura', quantity: 38, status: 'AVAILABLE', location: 'Estante E-2' },
-    { id: 'inv-7', name: 'Aceite hidráulico ISO 68', code: 'AH-0068', category: 'Lubricantes', quantity: 9, status: 'AVAILABLE', location: 'Estante F-1' },
-    { id: 'inv-8', name: 'Micrómetro digital 0-25 mm', code: 'MD-0025', category: 'Metrología', quantity: 0, status: 'OUT_OF_STOCK', location: 'Metrología' },
-    { id: 'inv-9', name: 'Disco de corte 4 1/2"', code: 'DC-0450', category: 'Consumibles', quantity: 25, status: 'AVAILABLE', location: 'Estante G-3' },
-    { id: 'inv-10', name: 'Juego de llaves mixtas', code: 'LM-1200', category: 'Manual', quantity: 1, status: 'LOANED', location: 'Herramientas' },
+    { id: 'inv-1', name: 'Rodamiento SKF 6205', code: 'RD-1001', category: 'Mecánica', quantity: 12, status: 'AVAILABLE', location: 'Estante A-1', qrCode: 'QR-RD-1001', certificate: 'CERT-MAT-001', controlledAtmosphere: true },
+    { id: 'inv-2', name: 'Sello mecánico 2"', code: 'SM-2024', category: 'Hidráulica', quantity: 4, status: 'AVAILABLE', location: 'Estante B-2', qrCode: 'QR-SM-2024', certificate: 'CERT-MAT-002' },
+    { id: 'inv-3', name: 'Válvula neumática 1/2', code: 'VN-5050', category: 'Neumática', quantity: 7, status: 'AVAILABLE', location: 'Estante C-1', qrCode: 'QR-VN-5050' },
+    { id: 'inv-4', name: 'Cable eléctrico 12 AWG', code: 'CE-8080', category: 'Eléctrica', quantity: 120, status: 'AVAILABLE', location: 'Estante D-4', qrCode: 'QR-CE-8080' },
+    { id: 'inv-5', name: 'Llave de torque 1"', code: 'LT-9090', category: 'Manual', quantity: 2, status: 'LOANED', location: 'Herramientas', qrCode: 'QR-LT-9090', laserMarked: true, calibrationDue: shiftDays(120), certificate: 'CAL-2026-012' },
+    { id: 'inv-6', name: 'Electrodo E7018', code: 'EL-7018', category: 'Soldadura', quantity: 38, status: 'AVAILABLE', location: 'Estante E-2', qrCode: 'QR-EL-7018', certificate: 'CERT-CONS-018', controlledAtmosphere: true },
+    { id: 'inv-7', name: 'Aceite hidráulico ISO 68', code: 'AH-0068', category: 'Lubricantes', quantity: 9, status: 'AVAILABLE', location: 'Estante F-1', qrCode: 'QR-AH-0068' },
+    { id: 'inv-8', name: 'Micrómetro digital 0-25 mm', code: 'MD-0025', category: 'Metrología', quantity: 0, status: 'OUT_OF_STOCK', location: 'Metrología', qrCode: 'QR-MD-0025', laserMarked: true, calibrationDue: shiftDays(-12), certificate: 'CAL-2025-088' },
+    { id: 'inv-9', name: 'Disco de corte 4 1/2"', code: 'DC-0450', category: 'Consumibles', quantity: 25, status: 'AVAILABLE', location: 'Estante G-3', qrCode: 'QR-DC-0450' },
+    { id: 'inv-10', name: 'Juego de llaves mixtas', code: 'LM-1200', category: 'Manual', quantity: 1, status: 'LOANED', location: 'Herramientas', qrCode: 'QR-LM-1200', laserMarked: true },
+    { id: 'inv-11', name: 'Colector de datos multicanal', code: 'CD-3200', category: 'Monitoreo', quantity: 1, status: 'AVAILABLE', location: 'Metrología', qrCode: 'QR-CD-3200', laserMarked: true, calibrationDue: shiftDays(60), certificate: 'CAL-2026-031' },
+    { id: 'inv-12', name: 'Videoscopio industrial', code: 'VS-8800', category: 'Inspección', quantity: 1, status: 'AVAILABLE', location: 'Metrología', qrCode: 'QR-VS-8800', laserMarked: true, calibrationDue: shiftDays(15), certificate: 'CAL-2026-044' },
+    { id: 'inv-13', name: 'Equipo PMI portátil', code: 'PMI-4400', category: 'Laboratorio', quantity: 1, status: 'AVAILABLE', location: 'Laboratorio', qrCode: 'QR-PMI-4400', laserMarked: true, calibrationDue: shiftDays(200), certificate: 'CAL-2026-050' },
   ];
 
   const loans: Loan[] = [
@@ -467,10 +968,18 @@ export function seedDatabase(): PreviewDatabase {
   return {
     users: USERS,
     clients: CLIENTS,
-    components: COMPONENTS,
-    routeSheets,
-    parts,
-    phases,
+    components,
+    assets: ASSETS,
+    serviceOrders,
+    serviceTemplates: SERVICE_TEMPLATES,
+    fieldJobs: FIELD_JOBS,
+    projects: PROJECTS,
+    supplyOrders: SUPPLY_ORDERS,
+    qualityRecords: QUALITY_RECORDS,
+    nonConformities: NON_CONFORMITIES,
+    routeSheets: allRouteSheets,
+    parts: allParts,
+    phases: allPhases,
     spareParts,
     inventory,
     loans,
