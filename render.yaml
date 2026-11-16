@@ -1,0 +1,54 @@
+# Blueprint de Render para el backend de TurboPre.
+#
+# Importante: NO se define `rootDir`. Render no expone los archivos que quedan
+# fuera del root directory y este backend necesita `pnpm-workspace.yaml`, el
+# lockfile de la raíz y `packages/shared`. Por eso el servicio usa la raíz del
+# repositorio como directorio de trabajo.
+
+services:
+  - type: web
+    name: turbopre-api
+    runtime: node
+    # `free` duerme el servicio por inactividad (cold start). Para QA continuo,
+    # cambiar a `starter` y habilitar `preDeployCommand`.
+    plan: free
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=backend
+    startCommand: node apps/backend/dist/main.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - apps/backend/**
+        - packages/shared/**
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+        - render.yaml
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # El login demo debe quedar deshabilitado en QA.
+      - key: AUTH_DEMO
+        value: "false"
+      # Render los pide al sincronizar el Blueprint (sync: false).
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: turbopre-db
+          property: connectionString
+    # Requiere plan pago. Descomentar cuando la base esté integrada:
+    # preDeployCommand: pnpm --filter backend exec prisma migrate deploy
+
+databases:
+  - name: turbopre-db
+    databaseName: turbopre
+    # La base gratuita de Render expira a los 30 días. Para QA permanente,
+    # cambiar a un plan pago.
+    plan: free
+    region: oregon

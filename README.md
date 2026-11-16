@@ -105,7 +105,8 @@ apps/frontend/src/
 
 - Alias `@/*` → `src/*` (configurado en `tsconfig.app.json` y `vite.config.ts`).
 - En desarrollo la API se consume por `/api` mediante el proxy de Vite hacia `http://localhost:3000`.
-  Para apuntar a otra URL define `VITE_API_URL` en `apps/frontend/.env`.
+  Para apuntar a otra URL define `VITE_API_URL` en `apps/frontend/.env`. En QA, Vercel
+  reescribe `/api/*` al backend (ver [Deploy de QA](#deploy-de-qa-vercel--render)).
 - El interceptor de Axios añade el `Bearer` y cierra la sesión ante un `401`.
 
 ## Backend
@@ -120,6 +121,91 @@ apps/backend/src/
 
 La validación usa `StandardSchemaValidationPipe` de Nest 12 con los esquemas zod de
 `@turbopre/shared`, así que el mismo contrato vale para el formulario y para la API.
+
+## Deploy de QA (Vercel + Render)
+
+El monorepo se despliega como **dos servicios independientes** desde el mismo repositorio.
+Requisito: el proyecto debe estar en GitHub con al menos un commit.
+
+### Frontend en Vercel
+
+| Ajuste | Valor |
+| --- | --- |
+| Root Directory | `apps/frontend` |
+| Framework | Vite |
+| Build Command | `cd ../.. && pnpm turbo run build --filter=frontend` |
+| Output Directory | `dist` |
+| Install Command | `pnpm install --frozen-lockfile` |
+
+`apps/frontend/vercel.json` ya deja configurado:
+
+- rewrite de `/api/*` hacia el backend de Render (así **no hay CORS** y funciona en
+  cualquier URL de preview),
+- fallback SPA a `/index.html`, necesario porque el router usa `createBrowserRouter`.
+
+> Antes del primer deploy cambia `https://turbopre-api.onrender.com` del rewrite por la
+> URL real del servicio de Render. Si el host cambia después, edita el archivo y
+> redeploya el frontend.
+>
+> En Vercel, la opción **“Include files outside the root directory in the Build Step”**
+> debe quedar activada para que `packages/shared` esté disponible en el build.
+
+Si prefieres llamar a la API directamente en lugar de usar el proxy, define
+`VITE_API_URL=https://<api>/api` en Vercel y agrega el dominio del frontend a
+`CORS_ORIGIN` del backend. Recuerda que `VITE_API_URL` se inlinea en tiempo de build.
+
+### Backend en Render
+
+Opción A (recomendada): **New → Blueprint**, seleccionar el repositorio y Render lee
+`render.yaml`.
+Opción B: crear un **Web Service** manual con runtime Node.
+
+| Ajuste | Valor |
+| --- | --- |
+| Root Directory | *(vacío: raíz del repositorio)* |
+| Build Command | `corepack enable && pnpm install --frozen-lockfile && pnpm turbo run build --filter=backend` |
+| Start Command | `node apps/backend/dist/main.js` |
+| Health Check Path | `/api/health` |
+
+Variables de entorno: `NODE_VERSION=24`, `NODE_ENV=production`, `AUTH_DEMO=false`,
+`JWT_SECRET`, `CORS_ORIGIN` y `DATABASE_URL` (Render Postgres). **No definas `PORT`**:
+lo inyecta Render y la API ya lo lee.
+
+> ⚠️ No configures `apps/backend` como Root Directory en Render: Render no expone los
+> archivos que quedan fuera de ese directorio y el build necesita el workspace completo
+> (`pnpm-workspace.yaml`, el lockfile y `packages/shared`).
+
+Migraciones: en plan pago, descomenta `preDeployCommand` en `render.yaml`; en plan free,
+ejecútalas manualmente apuntando a la base de QA:
+
+```bash
+pnpm --filter backend exec prisma migrate deploy
+```
+
+### Orden de despliegue y verificación
+
+1. Desplegar el backend y comprobar `GET https://<api>/api/health`.
+2. Copiar esa URL al rewrite de `apps/frontend/vercel.json` y desplegar el frontend.
+3. Probar login real, recarga directa de `/ajustes` (fallback SPA) y una llamada a `/api/*`.
+4. Revisar `CORS_ORIGIN`: acepta varios orígenes separados por comas y comodines de un
+   nivel, por ejemplo `https://turbopre.vercel.app,https://*.vercel.app`.
+
+### Limitaciones del plan gratuito
+
+- Render free duerme el servicio por inactividad: el primer request (y el proxy de Vercel)
+  puede tardar decenas de segundos.
+- La base gratuita de Render expira a los 30 días.
+- Para QA continuo conviene un plan pago y habilitar las migraciones en el pre-deploy.
+
+## Documentación para agentes
+
+- `AGENTS.md` (raíz): contexto del negocio — hojas de ruta, áreas/roles, alcance — y las
+  preguntas obligatorias antes de modelar el dominio.
+- `apps/frontend/AGENTS.md`: convenciones de React, shadcn, datos y estilos.
+- `apps/backend/AGENTS.md`: notas del CLI de Nest 12 (ESM, Vitest, validación con zod).
+
+OpenCode carga estos archivos automáticamente. Para trabajar en varias áreas, abre la
+sesión desde la raíz del monorepo.
 
 ## Notas
 
