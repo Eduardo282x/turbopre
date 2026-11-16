@@ -1,86 +1,71 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { LuLogOut, LuMenu } from 'react-icons/lu';
-import { useLocation, useNavigate } from 'react-router';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Menu, PanelLeftOpen } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { getInitials } from '@/lib/formatters';
-import { useAuthStore } from '@/stores/use-auth-store';
+import { useClock } from '@/hooks/use-clock';
+import { usePageMeta } from '@/hooks/use-page-meta';
+import { formatTime } from '@/lib/formatters';
 import { AppSidebar } from './app-sidebar';
+import { PreviewRoleSwitcher } from './preview-role-switcher';
+import { ThemeToggle } from './theme-toggle';
+import { UserMenu } from './user-menu';
 
-const routeTitles: Record<string, string> = {
-  '/': 'Inicio',
-  '/ajustes': 'Ajustes',
-};
+interface AppHeaderProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}
 
-export function AppHeader() {
-  const user = useAuthStore((state) => state.user);
-  const signOut = useAuthStore((state) => state.signOut);
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-
-  const handleSignOut = () => {
-    signOut();
-    queryClient.clear();
-    navigate('/login', { replace: true });
-  };
+export function AppHeader({ collapsed, onToggleCollapse }: AppHeaderProps) {
+  const { title, subtitle } = usePageMeta();
+  const now = useClock();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="flex h-16 items-center gap-3 border-b bg-background px-4 md:px-6">
-      <Sheet>
+    <header className="no-print sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-border/80 bg-background/85 px-4 py-2 backdrop-blur-md md:px-6">
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menú">
-            <LuMenu />
+          <Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label="Abrir menú">
+            <Menu />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <SheetTitle className="sr-only">Navegación</SheetTitle>
-          <AppSidebar className="w-full border-r-0" />
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetTitle className="sr-only">Navegación principal</SheetTitle>
+          <AppSidebar onNavigate={() => setMobileOpen(false)} className="w-full border-r-0" />
         </SheetContent>
       </Sheet>
 
-      <h1 className="text-sm font-semibold text-foreground md:text-base">
-        {routeTitles[pathname] ?? 'TurboPre'}
-      </h1>
+      <div className="hidden lg:flex">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'}
+          className="text-muted-foreground"
+        >
+          <PanelLeftOpen className={collapsed ? undefined : 'rotate-180'} />
+        </Button>
+      </div>
 
-      <div className="ml-auto flex items-center gap-2">
-        <Badge variant="secondary" className="hidden sm:inline-flex">
-          {user?.role === 'ADMIN' ? 'Administrador' : 'Staff'}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate font-heading text-lg font-semibold tracking-tight text-foreground">
+            {title}
+          </p>
+          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
+            Modo preview
+          </Badge>
+        </div>
+        <p className="hidden truncate text-xs text-muted-foreground sm:block">{subtitle}</p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Badge variant="outline" className="hidden font-mono text-[11px] tabular-nums md:inline-flex">
+          {formatTime(now)}
         </Badge>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-9 gap-2 px-2">
-              <Avatar className="size-7">
-                <AvatarFallback className="text-xs">
-                  {user ? getInitials(user.name) : 'TP'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium sm:inline">{user?.name ?? 'Invitado'}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="space-y-0.5">
-              <p className="text-sm font-medium">{user?.name ?? 'Invitado'}</p>
-              <p className="text-xs font-normal text-muted-foreground">{user?.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
-              <LuLogOut />
-              Cerrar sesión
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <PreviewRoleSwitcher />
+        <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
   );

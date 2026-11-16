@@ -72,6 +72,24 @@ src/
 - El login real está pendiente de conectar a PostgreSQL; hoy funciona contra el
   usuario demo del backend (`admin@turbopre.dev / Admin123!`).
 
+## Modo preview (estado actual)
+
+- El frontend del mockup está adaptado y **no** consume el backend. La sesión y
+  los datos viven en `src/features/preview/` (zustand + `localStorage`).
+- Roles del preview: Usuario Global, Planificación y Diseño, Ingeniería, Ventas,
+  Taller, Operador por área, Almacén y Calidad.
+- El ciclo de la hoja de ruta es Borrador → En revisión → Aprobada → En
+  ejecución → En calidad → Lista para entrega → Entregada.
+- El login de vidrio permite entrar con cualquier usuario del listado y cambiar
+  de usuario desde el header. Configuración → **Restablecer datos** vuelve a la
+  semilla.
+- La tabla reutilizable está en `src/components/table-kit/` y las gráficas en
+  `src/components/charts/` (shadcn Chart + Recharts).
+- Detalles y modelo provisional: `docs/preview-frontend.md`.
+- Para volver al backend: sustituir los selectores del store preview por
+  `services/<dominio>/` + TanStack Query y cambiar `usePreviewSession` por
+  `useAuthStore`.
+
 ## Entorno
 
 - En desarrollo, `/api` se proxya a `http://localhost:3000` (ver `vite.config.ts`).

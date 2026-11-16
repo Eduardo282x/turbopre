@@ -1,11 +1,22 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="TurboPre — panel de administración" />
-    <title>TurboPre</title>
+    <meta name="description" content="TurboPre — gestión de hojas de ruta, componentes y repuestos" />
+    <title>TurboPre · MES</title>
+    <script>
+      try {
+        var savedTheme = localStorage.getItem('turbopre.theme');
+        if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'pastel') {
+          document.documentElement.className = savedTheme;
+          document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+        }
+      } catch (error) {
+        // Ignore storage errors before the app loads.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

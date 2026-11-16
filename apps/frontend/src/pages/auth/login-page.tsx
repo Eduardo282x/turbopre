@@ -1,113 +1,128 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { LuDatabase, LuShieldCheck, LuZap } from 'react-icons/lu';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { type LoginInput, loginSchema } from '@turbopre/shared';
+import { z } from 'zod';
+import fondo from '@/assets/brand/fondo.jpg';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { getApiErrorMessage } from '@/lib/api-error';
-import { authService } from '@/services/auth/auth.service';
-import { useAuthStore } from '@/stores/use-auth-store';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ROLE_BY_ID, ROLE_OPTIONS, getRoleDisplay } from '@/features/preview/config';
+import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
+import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { getInitials } from '@/lib/formatters';
 
-const highlights = [
-  { icon: LuZap, text: 'Vite + React 19 con recarga instantánea' },
-  { icon: LuDatabase, text: 'API NestJS + Prisma lista para PostgreSQL' },
-  { icon: LuShieldCheck, text: 'JWT, zustand y rutas protegidas' },
-];
+const formSchema = z.object({
+  username: z.string().min(1, 'Ingresa tu nombre de usuario'),
+  password: z.string().min(4, 'La contraseña debe tener al menos 4 caracteres'),
+});
 
-const currentYear = new Date().getFullYear();
+type FormInput = z.infer<typeof formSchema>;
+const DEMO_PASSWORD = 'demo1234';
+const CURRENT_YEAR = new Date().getFullYear();
 
 export function LoginPage() {
-  const accessToken = useAuthStore((state) => state.accessToken);
-  const signIn = useAuthStore((state) => state.signIn);
+  const currentUser = useCurrentUser();
+  const users = usePreviewStore((state) => state.db.users);
+  const logLogin = usePreviewStore((state) => state.logLogin);
+  const signIn = usePreviewSession((state) => state.signIn);
   const navigate = useNavigate();
   const location = useLocation();
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
 
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
-  const form = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+  const form = useForm<FormInput>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { username: '', password: '' },
     mode: 'onTouched',
   });
 
-  const mutation = useMutation({
-    mutationFn: authService.login,
-    onSuccess: ({ accessToken: token, user }) => {
-      signIn({ accessToken: token, user });
-      toast.success(`Bienvenido, ${user.name}`);
-      navigate(from, { replace: true });
-    },
-    onError: (error) => {
-      toast.error(getApiErrorMessage(error, 'No pudimos iniciar sesión'));
-    },
-  });
-
-  if (accessToken) {
+  if (currentUser) {
     return <Navigate to="/" replace />;
   }
 
-  const onSubmit = form.handleSubmit((values) => mutation.mutate(values));
+  const enterAs = (userId: string) => {
+    const user = users.find((candidate) => candidate.id === userId);
+    if (!user) return;
+    signIn(user.id);
+    logLogin(user.id);
+    if (!remember) {
+      // The session store persists by default; remove the stored copy so the
+      // next reload asks for login again when "Recordarme" is unchecked.
+      window.localStorage.removeItem('turbopre.preview.session');
+    }
+    toast.success(`Bienvenido, ${user.name}`, { description: getRoleDisplay(user) });
+    navigate(from, { replace: true });
+  };
+
+  const onSubmit = form.handleSubmit((values) => {
+    const user = users.find(
+      (candidate) => candidate.username.toLowerCase() === values.username.trim().toLowerCase(),
+    );
+    if (!user) {
+      toast.error('Usuario no encontrado', {
+        description: 'Prueba con uno de los accesos rápidos o usa un usuario del listado.',
+      });
+      return;
+    }
+    enterAs(user.id);
+  });
+
+  const grouped = ROLE_OPTIONS.map((role) => ({
+    role,
+    users: users.filter((user) => user.role === role.id),
+  })).filter((group) => group.users.length > 0);
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <section className="relative hidden flex-col justify-between bg-zinc-950 p-10 text-zinc-100 lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-zinc-100 text-sm font-bold text-zinc-900">
-            TP
-          </div>
-          <span className="text-lg font-semibold tracking-tight">TurboPre</span>
-        </div>
+    <div
+      className="relative flex min-h-svh flex-col items-center justify-center bg-zinc-950 bg-cover bg-center px-4 py-10"
+      style={{ backgroundImage: `url(${fondo})` }}
+    >
+      <div className="absolute inset-0 bg-[#0a0e14]/70 backdrop-blur-[3px]" aria-hidden="true" />
 
-        <div className="max-w-md space-y-6">
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight">
-            Un monorepo, dos aplicaciones, cero fricción.
-          </h1>
-          <p className="text-sm leading-relaxed text-zinc-400">
-            Frontend en React con Vite, Tailwind y shadcn/ui. Backend en NestJS con Prisma y PostgreSQL.
-            Orquestado con Turborepo y pnpm.
-          </p>
-          <ul className="space-y-3">
-            {highlights.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3 text-sm text-zinc-300">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-zinc-900 ring-1 ring-zinc-800">
-                  <Icon className="size-4" />
-                </span>
-                {text}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="relative z-10 w-full max-w-5xl">
+        <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="flex flex-col justify-between gap-8 p-7 sm:p-10">
+            <div className="space-y-5">
+              <BrandLogo className="h-10 brightness-0 invert" />
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                  TurboPre · MES
+                </p>
+                <h1 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                  Bienvenido
+                </h1>
+                <p className="max-w-md text-sm leading-relaxed text-zinc-300">
+                  Ingresa tus credenciales para acceder al centro de control de hojas de ruta,
+                  componentes, partes y repuestos.
+                </p>
+              </div>
+            </div>
 
-        <p className="text-xs text-zinc-500">© {currentYear} TurboPre</p>
-      </section>
-
-      <section className="flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-0 shadow-none sm:border sm:shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl">Inicia sesión</CardTitle>
-            <CardDescription>Accede al panel con tus credenciales de TurboPre.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={onSubmit} noValidate>
+            <form onSubmit={onSubmit} noValidate className="space-y-4">
               <FieldGroup className="gap-4">
                 <Controller
                   control={form.control}
-                  name="email"
+                  name="username"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="email">Correo electrónico</FieldLabel>
+                      <FieldLabel htmlFor="username" className="text-zinc-200">
+                        Nombre de usuario
+                      </FieldLabel>
                       <Input
                         {...field}
-                        id="email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="admin@turbopre.dev"
+                        id="username"
+                        autoComplete="username"
+                        placeholder="Ej: ana.rivas"
                         aria-invalid={fieldState.invalid}
+                        className="h-11 border-white/15 bg-white/10 text-white placeholder:text-zinc-500 focus-visible:border-cyan-400 focus-visible:ring-cyan-400/30"
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
@@ -119,47 +134,104 @@ export function LoginPage() {
                   name="password"
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="password">Contraseña</FieldLabel>
-                      <Input
-                        {...field}
-                        id="password"
-                        type="password"
-                        autoComplete="current-password"
-                        placeholder="••••••••"
-                        aria-invalid={fieldState.invalid}
-                      />
+                      <FieldLabel htmlFor="password" className="text-zinc-200">
+                        Contraseña
+                      </FieldLabel>
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          autoComplete="current-password"
+                          placeholder="••••••••"
+                          aria-invalid={fieldState.invalid}
+                          className="h-11 border-white/15 bg-white/10 pr-10 text-white placeholder:text-zinc-500 focus-visible:border-cyan-400 focus-visible:ring-cyan-400/30"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="absolute top-1/2 right-1.5 -translate-y-1/2 text-zinc-400 hover:bg-white/10 hover:text-white"
+                          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                          onClick={() => setShowPassword((value) => !value)}
+                        >
+                          {showPassword ? <EyeOff /> : <Eye />}
+                        </Button>
+                      </div>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                     </Field>
                   )}
                 />
-
-                <Button type="submit" className="w-full" disabled={mutation.isPending}>
-                  {mutation.isPending ? 'Ingresando…' : 'Ingresar'}
-                </Button>
               </FieldGroup>
-            </form>
 
-            <div className="rounded-lg border border-dashed bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-              <p className="font-medium text-foreground">Modo demo (sin base de datos)</p>
-              <p>
-                admin@turbopre.dev · Admin123!
-              </p>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="mt-1 h-auto p-0 text-xs"
-                onClick={() => {
-                  form.setValue('email', 'admin@turbopre.dev', { shouldValidate: true });
-                  form.setValue('password', 'Admin123!', { shouldValidate: true });
-                }}
-              >
-                Rellenar credenciales demo
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-300">
+                <label className="flex items-center gap-2">
+                  <Checkbox checked={remember} onCheckedChange={(value) => setRemember(value === true)} />
+                  Recordarme
+                </label>
+                <button
+                  type="button"
+                  className="font-medium text-cyan-300 underline-offset-4 hover:underline"
+                  onClick={() => toast.info('Contacta al administrador para recuperar tu acceso.')}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+
+              <Button type="submit" className="h-11 w-full bg-cyan-500 text-zinc-950 hover:bg-cyan-400">
+                <LogIn /> Iniciar sesión
               </Button>
+
+              <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
+                Modo preview sin backend. Contraseña demo: <span className="font-mono text-zinc-200">{DEMO_PASSWORD}</span>
+              </p>
+            </form>
+          </section>
+
+          <section className="border-t border-white/10 bg-black/20 p-6 lg:border-t-0 lg:border-l sm:p-8">
+            <div className="mb-4 space-y-1">
+              <p className="font-heading text-sm font-semibold text-white">Acceso rápido</p>
+              <p className="text-xs text-zinc-400">
+                Entra como cualquier rol para revisar su navegación y permisos.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      </section>
+            <ScrollArea className="h-[460px] pr-3">
+              <div className="space-y-5">
+                {grouped.map(({ role, users: roleUsers }) => (
+                  <div key={role.id}>
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                      {ROLE_BY_ID[role.id].label}
+                    </p>
+                    <div className="space-y-1">
+                      {roleUsers.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => enterAs(user.id)}
+                          className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                        >
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
+                            {getInitials(user.name)}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-zinc-100">{user.name}</span>
+                            <span className="block truncate text-[11px] text-zinc-400">{getRoleDisplay(user)}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </section>
+        </div>
+
+        <p className="mt-5 text-center text-[11px] text-white/45">
+          © {CURRENT_YEAR} Turbopre Services — Innovación y trazabilidad en taller
+        </p>
+      </div>
     </div>
   );
 }
