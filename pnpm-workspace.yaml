@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm 11 bloquea por defecto los scripts de instalación de dependencias.
+# Solo se permiten los paquetes que realmente necesitan ejecutar binarios.
+allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
