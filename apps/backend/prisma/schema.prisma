@@ -1,3 +1,13 @@
+// TurboPre — CAMI (Control Automatizado de Mantenimiento Industrial)
+// Esquema de dominio del sistema de hojas de ruta.
+//
+// Convenciones:
+// - Modelos y columnas en inglés; etiquetas de negocio y comentarios en español.
+// - IDs cuid() para todas las tablas.
+// - Nombres físicos en snake_case mediante @@map / @map.
+// - Los catálogos no se borran: se desactivan con isActive.
+// - La documentación funcional y los diagramas viven en docs/domain-model.md.
+
 generator client {
   provider            = "prisma-client"
   output              = "../src/generated/prisma"
@@ -9,19 +19,885 @@ datasource db {
   provider = "postgresql"
 }
 
+// ============================================================
+// ENUMS
+// ============================================================
+
+/// Roles del negocio. "WORKSHOP" es el jefe/supervisor de taller;
+/// "OPERATOR" es el operador que ejecuta tareas en la hoja de ruta.
 enum UserRole {
   ADMIN
-  STAFF
+  SALES
+  WORKSHOP
+  OPERATOR
+  ENGINEER
+  QUALITY
+  PROJECT_MANAGER
+  WAREHOUSE
 }
 
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      UserRole @default(STAFF)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// Naturaleza del proceso para filtrar inspecciones y tareas.
+enum ProcessKind {
+  WORKSHOP
+  ENGINEERING
+  QUALITY
+  SUPPORT
+}
 
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Estado comercial de la ODS. El detalle operativo vive en RouteSheet.
+enum ServiceOrderStatus {
+  OPEN
+  IN_PROGRESS
+  READY_FOR_DELIVERY
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum InspectionStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Ciclo de vida detallado de la hoja de ruta.
+enum RouteSheetStatus {
+  DRAFT
+  PENDING_APPROVAL
+  RELEASED
+  IN_PROGRESS
+  PENDING_ANNEX_REVIEW
+  PENDING_QUALITY_APPROVAL
+  COMPLETED
+  CANCELLED
+}
+
+/// "BLOCKED" no se guarda: se calcula a partir de la secuencia.
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskSource {
+  INSPECTION
+  ROUTE_SHEET
+}
+
+enum ReviewStage {
+  MANAGER_APPROVAL
+  ANNEX_REVIEW
+  QUALITY_APPROVAL
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum AttachmentType {
+  PHOTO
+  PDF
+  PLAN
+  CERTIFICATE
+  OTHER
+}
+
+enum ItemType {
+  SPARE_PART
+  CONSUMABLE
+  TOOL
+  EQUIPMENT
+}
+
+enum InventoryUnitStatus {
+  AVAILABLE
+  LOANED
+  IN_USE
+  MAINTENANCE
+  RETIRED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  RETURN
+}
+
+enum MaterialRequestStatus {
+  PENDING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum MaterialRequestItemStatus {
+  PENDING
+  IN_STOCK
+  PURCHASE_REQUIRED
+  PURCHASED
+  DELIVERED
+  REJECTED
+}
+
+enum LoanStatus {
+  ACTIVE
+  PARTIALLY_RETURNED
+  RETURNED
+  CANCELLED
+}
+
+enum CalibrationResult {
+  PASSED
+  FAILED
+  CONDITIONAL
+}
+
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  COMPLETE
+  DELIVER
+  LOGIN
+  STATUS_CHANGE
+}
+
+enum AiSuggestionStatus {
+  DRAFT
+  ACCEPTED
+  REJECTED
+}
+
+// ============================================================
+// ORGANIZACIÓN Y ACCESO
+// ============================================================
+
+/// Área de la empresa: Administración, Ventas, Taller, Ingeniería,
+/// Calidad, Gerencia de Proyectos, Almacén.
+model Department {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  processes Process[]
+
+  @@map("departments")
+}
+
+/// Proceso dentro de un área. Taller: Mecanizado, Generadores,
+/// Equipos Rotativos y Soldadura. Ingeniería: Planos, PMI,
+/// Corte de Muestras y Análisis Metalográfico.
+model Process {
+  id           String      @id @default(cuid())
+  departmentId String      @map("department_id")
+  code         String      @unique
+  name         String
+  kind         ProcessKind @default(WORKSHOP)
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  department     Department      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  jobPositions   JobPosition[]
+  plantLocations PlantLocation[]
+
+  @@index([departmentId])
+  @@map("processes")
+}
+
+/// Puesto de trabajo. Ej.: "Mecánico I" dentro de Equipos Rotativos.
+model JobPosition {
+  id        String   @id @default(cuid())
+  processId String   @map("process_id")
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  process Process @relation(fields: [processId], references: [id], onDelete: Restrict)
+  users   User[]
+  tasks   Task[]
+
+  @@unique([processId, name])
+  @@index([processId])
+  @@map("job_positions")
+}
+
+/// Usuario creado por el administrador. No hay auto-registro.
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String?   @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  role          UserRole
+  jobPositionId String?   @map("job_position_id")
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdById   String?   @map("created_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  jobPosition  JobPosition? @relation(fields: [jobPositionId], references: [id], onDelete: SetNull)
+  createdBy    User?        @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers User[]       @relation("UserCreatedBy")
+
+  createdServiceOrders        ServiceOrder[]              @relation("ServiceOrderCreatedBy")
+  createdInspections          Inspection[]                @relation("InspectionCreatedBy")
+  approvedInspections         Inspection[]                @relation("InspectionApprovedBy")
+  createdTasks                Task[]                      @relation("TaskCreatedBy")
+  assignedTasks               Task[]                      @relation("TaskAssignedTo")
+  uploadedAttachments         TaskAttachment[]            @relation("AttachmentUploadedBy")
+  reviewedAttachments         TaskAttachment[]            @relation("AttachmentReviewedBy")
+  createdRouteSheets          RouteSheet[]                @relation("RouteSheetCreatedBy")
+  routeSheetReviews           RouteSheetReview[]          @relation("ReviewReviewer")
+  uploadedRouteSheetDocuments RouteSheetDocument[]        @relation("RouteSheetDocumentUploadedBy")
+  locationMovements           RouteSheetLocationHistory[] @relation("LocationMovedBy")
+  materialRequests            MaterialRequest[]           @relation("MaterialRequestRequestedBy")
+  authorizedLoans             Loan[]                      @relation("LoanAuthorizedBy")
+  receivedLoans               Loan[]                      @relation("LoanReceivedBy")
+  performedCalibrations       Calibration[]               @relation("CalibrationPerformedBy")
+  stockMovements              StockMovement[]             @relation("StockMovementPerformedBy")
+  auditLogs                   AuditLog[]
+  aiSuggestions               AiRouteSheetSuggestion[]    @relation("AiSuggestionRequestedBy")
+  acceptedAiSuggestions       AiRouteSheetSuggestion[]    @relation("AiSuggestionAcceptedBy")
+  managedProjects             Project[]                   @relation("ProjectManager")
+
+  @@index([jobPositionId])
+  @@index([createdById])
+  @@index([role])
+  @@index([isActive])
   @@map("users")
+}
+
+// ============================================================
+// COMERCIAL Y ÓRDENES DE SERVICIO
+// ============================================================
+
+model Client {
+  id           String   @id @default(cuid())
+  code         String?  @unique
+  name         String
+  taxId        String?  @unique @map("tax_id")
+  contactName  String?  @map("contact_name")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  address      String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sites         Site[]
+  equipment     Equipment[]
+  projects      Project[]
+  serviceOrders ServiceOrder[]
+
+  @@map("clients")
+}
+
+/// Sitio/planta del cliente donde está el equipo.
+model Site {
+  id        String   @id @default(cuid())
+  clientId  String   @map("client_id")
+  name      String
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  serviceOrders ServiceOrder[]
+
+  @@unique([clientId, name])
+  @@index([clientId])
+  @@map("sites")
+}
+
+/// Equipo del cliente. El código/tag es único por cliente.
+model Equipment {
+  id           String   @id @default(cuid())
+  clientId     String   @map("client_id")
+  code         String
+  name         String
+  serialNumber String?  @map("serial_number")
+  manufacturer String?
+  model        String?
+  type         String?
+  notes        String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  serviceOrders ServiceOrder[]
+
+  @@unique([clientId, code])
+  @@index([clientId])
+  @@map("equipment")
+}
+
+/// Agrupación opcional de órdenes de servicio.
+model Project {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  name      String
+  clientId  String?       @map("client_id")
+  managerId String?       @map("manager_id")
+  status    ProjectStatus @default(PLANNED)
+  startDate DateTime?     @map("start_date")
+  dueDate   DateTime?     @map("due_date")
+  notes     String?
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  client        Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  manager       User?          @relation("ProjectManager", fields: [managerId], references: [id], onDelete: SetNull)
+  serviceOrders ServiceOrder[]
+
+  @@index([clientId])
+  @@index([managerId])
+  @@index([status])
+  @@map("projects")
+}
+
+/// ODS (orden de servicio) creada por Mercadeo y Ventas.
+/// Una ODS corresponde a un equipo; los retrabajos/sub-órdenes
+/// se cuelgan con parentServiceOrderId.
+model ServiceOrder {
+  id                   String             @id @default(cuid())
+  orderNumber          String             @unique @map("order_number")
+  parentServiceOrderId String?            @map("parent_service_order_id")
+  clientId             String             @map("client_id")
+  siteId               String             @map("site_id")
+  equipmentId          String             @map("equipment_id")
+  projectId            String?            @map("project_id")
+  createdById          String             @map("created_by_id")
+  description          String
+  scope                String
+  priority             Priority           @default(MEDIUM)
+  status               ServiceOrderStatus @default(OPEN)
+  requestedAt          DateTime           @default(now()) @map("requested_at")
+  dueAt                DateTime?          @map("due_at")
+  deliveredAt          DateTime?          @map("delivered_at")
+  closedAt             DateTime?          @map("closed_at")
+  notes                String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  parent    ServiceOrder?  @relation("ServiceOrderHierarchy", fields: [parentServiceOrderId], references: [id], onDelete: SetNull)
+  children  ServiceOrder[] @relation("ServiceOrderHierarchy")
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  site      Site           @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  equipment Equipment      @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  project   Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdBy User           @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  inspections      Inspection[]
+  routeSheet       RouteSheet?
+  materialRequests MaterialRequest[]
+  loans            Loan[]
+  aiSuggestions    AiRouteSheetSuggestion[]
+
+  @@index([clientId])
+  @@index([siteId])
+  @@index([equipmentId])
+  @@index([projectId])
+  @@index([createdById])
+  @@index([status])
+  @@index([dueAt])
+  @@index([parentServiceOrderId])
+  @@map("service_orders")
+}
+
+// ============================================================
+// INSPECCIÓN Y EJECUCIÓN
+// ============================================================
+
+/// Inspección creada por Servicio de Taller a partir de una ODS.
+model Inspection {
+  id               String           @id @default(cuid())
+  code             String           @unique
+  serviceOrderId   String           @map("service_order_id")
+  createdById      String           @map("created_by_id")
+  technicalDetails String?          @map("technical_details")
+  status           InspectionStatus @default(OPEN)
+  approvedById     String?          @map("approved_by_id")
+  approvedAt       DateTime?        @map("approved_at")
+  rejectionReason  String?          @map("rejection_reason")
+  startedAt        DateTime?        @map("started_at")
+  completedAt      DateTime?        @map("completed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("InspectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy   User?        @relation("InspectionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  tasks        Task[]
+
+  @@index([serviceOrderId])
+  @@index([createdById])
+  @@index([approvedById])
+  @@index([status])
+  @@map("inspections")
+}
+
+/// Tarea ejecutable. Es la misma fila cuando una tarea nace en una
+/// inspección y luego pasa a la hoja de ruta: se le asigna routeSheetId
+/// y sequence, conservando inspectionId y la evidencia.
+model Task {
+  id               String     @id @default(cuid())
+  inspectionId     String?    @map("inspection_id")
+  routeSheetId     String?    @map("route_sheet_id")
+  jobPositionId    String     @map("job_position_id")
+  assignedToId     String?    @map("assigned_to_id")
+  createdById      String     @map("created_by_id")
+  sequence         Int?
+  source           TaskSource @default(ROUTE_SHEET)
+  description      String
+  status           TaskStatus @default(PENDING)
+  requiresEvidence Boolean    @default(true) @map("requires_evidence")
+  estimatedMinutes Int?       @map("estimated_minutes")
+  startedAt        DateTime?  @map("started_at")
+  completedAt      DateTime?  @map("completed_at")
+  notes            String?
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  inspection  Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  routeSheet  RouteSheet? @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  jobPosition JobPosition @relation(fields: [jobPositionId], references: [id], onDelete: Restrict)
+  assignedTo  User?       @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy   User        @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  attachments TaskAttachment[]
+
+  @@index([inspectionId])
+  @@index([routeSheetId, sequence])
+  @@index([jobPositionId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+/// Evidencia de una tarea. isSelectedForAnnex lo decide Ingeniería
+/// en la revisión de anexos; null significa "sin revisar".
+model TaskAttachment {
+  id                 String         @id @default(cuid())
+  taskId             String         @map("task_id")
+  url                String
+  type               AttachmentType @default(PHOTO)
+  uploadedById       String         @map("uploaded_by_id")
+  isSelectedForAnnex Boolean?       @map("is_selected_for_annex")
+  reviewedById       String?        @map("reviewed_by_id")
+  reviewedAt         DateTime?      @map("reviewed_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  task       Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User  @relation("AttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+  reviewedBy User? @relation("AttachmentReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([uploadedById])
+  @@index([reviewedById])
+  @@map("task_attachments")
+}
+
+// ============================================================
+// HOJA DE RUTA Y APROBACIONES
+// ============================================================
+
+/// Hoja de ruta creada por Ingeniería y Soporte Técnico.
+/// Una ODS tiene una sola hoja activa.
+model RouteSheet {
+  id                String           @id @default(cuid())
+  code              String           @unique
+  serviceOrderId    String           @unique @map("service_order_id")
+  createdById       String           @map("created_by_id")
+  status            RouteSheetStatus @default(DRAFT)
+  currentLocationId String?          @map("current_location_id")
+  releasedAt        DateTime?        @map("released_at")
+  completedAt       DateTime?        @map("completed_at")
+  notes             String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  serviceOrder    ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  createdBy       User           @relation("RouteSheetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  currentLocation PlantLocation? @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
+
+  tasks            Task[]
+  reviews          RouteSheetReview[]
+  documents        RouteSheetDocument[]
+  locationHistory  RouteSheetLocationHistory[]
+  materialRequests MaterialRequest[]
+
+  @@index([createdById])
+  @@index([status])
+  @@index([currentLocationId])
+  @@map("route_sheets")
+}
+
+/// Historial de aprobaciones y rechazos de la hoja de ruta.
+/// Reemplaza el booleano "aprobado" y la tabla de calidad duplicada.
+model RouteSheetReview {
+  id           String         @id @default(cuid())
+  routeSheetId String         @map("route_sheet_id")
+  stage        ReviewStage
+  reviewerId   String         @map("reviewer_id")
+  decision     ReviewDecision
+  comments     String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  reviewer   User       @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([routeSheetId, stage])
+  @@index([reviewerId])
+  @@map("route_sheet_reviews")
+}
+
+/// Planos, procedimientos y anexos de la hoja de ruta.
+model RouteSheetDocument {
+  id           String         @id @default(cuid())
+  routeSheetId String         @map("route_sheet_id")
+  url          String
+  type         AttachmentType @default(PDF)
+  uploadedById String         @map("uploaded_by_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  uploadedBy User       @relation("RouteSheetDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([routeSheetId])
+  @@index([uploadedById])
+  @@map("route_sheet_documents")
+}
+
+// ============================================================
+// MAPA DE PLANTA
+// ============================================================
+
+/// Ubicación física del taller para el mapa de planta.
+model PlantLocation {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  processId String?  @map("process_id")
+  mapX      Float?   @map("map_x")
+  mapY      Float?   @map("map_y")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  process         Process?                    @relation(fields: [processId], references: [id], onDelete: SetNull)
+  routeSheets     RouteSheet[]
+  locationHistory RouteSheetLocationHistory[]
+
+  @@index([processId])
+  @@map("plant_locations")
+}
+
+/// Trazabilidad de los movimientos de la hoja por el taller.
+model RouteSheetLocationHistory {
+  id           String   @id @default(cuid())
+  routeSheetId String   @map("route_sheet_id")
+  locationId   String   @map("location_id")
+  movedById    String   @map("moved_by_id")
+  movedAt      DateTime @default(now()) @map("moved_at")
+  notes        String?
+
+  routeSheet RouteSheet    @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  location   PlantLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  movedBy    User          @relation("LocationMovedBy", fields: [movedById], references: [id], onDelete: Restrict)
+
+  @@index([routeSheetId])
+  @@index([locationId])
+  @@index([movedById])
+  @@map("route_sheet_location_history")
+}
+
+// ============================================================
+// ALMACÉN, INVENTARIO Y PRÉSTAMOS
+// ============================================================
+
+model ItemCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items InventoryItem[]
+
+  @@map("item_categories")
+}
+
+/// Ítem de inventario: repuesto, consumible, herramienta o equipo.
+model InventoryItem {
+  id                  String   @id @default(cuid())
+  sku                 String   @unique
+  name                String
+  categoryId          String   @map("category_id")
+  itemType            ItemType @default(SPARE_PART) @map("item_type")
+  unit                String   @default("UND")
+  stockQuantity       Int      @default(0) @map("stock_quantity")
+  minimumStock        Int      @default(0) @map("minimum_stock")
+  tracksSerial        Boolean  @default(false) @map("tracks_serial")
+  requiresCalibration Boolean  @default(false) @map("requires_calibration")
+  isLoanable          Boolean  @default(false) @map("is_loanable")
+  storageLocation     String?  @map("storage_location")
+  notes               String?
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  category       ItemCategory          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  units          InventoryUnit[]
+  stockMovements StockMovement[]
+  requestItems   MaterialRequestItem[]
+  loanItems      LoanItem[]
+
+  @@index([categoryId])
+  @@index([itemType])
+  @@index([isActive])
+  @@map("inventory_items")
+}
+
+/// Unidad serializada de un ítem: herramienta, instrumento o equipo.
+model InventoryUnit {
+  id               String              @id @default(cuid())
+  inventoryItemId  String              @map("inventory_item_id")
+  serialNumber     String              @unique @map("serial_number")
+  status           InventoryUnitStatus @default(AVAILABLE)
+  calibrationDueAt DateTime?           @map("calibration_due_at")
+  storageLocation  String?             @map("storage_location")
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  calibrations  Calibration[]
+  loanItems     LoanItem[]
+
+  @@index([inventoryItemId])
+  @@index([status])
+  @@index([calibrationDueAt])
+  @@map("inventory_units")
+}
+
+/// Movimiento de stock para trazabilidad de entradas, salidas y ajustes.
+model StockMovement {
+  id              String            @id @default(cuid())
+  inventoryItemId String            @map("inventory_item_id")
+  type            StockMovementType
+  quantity        Int
+  reason          String?
+  referenceType   String?           @map("reference_type")
+  referenceId     String?           @map("reference_id")
+  performedById   String            @map("performed_by_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  performedBy   User          @relation("StockMovementPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([inventoryItemId])
+  @@index([performedById])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+/// Solicitud de repuestos/materiales. Tiene varias líneas.
+model MaterialRequest {
+  id             String                @id @default(cuid())
+  requestNumber  String                @unique @map("request_number")
+  serviceOrderId String                @map("service_order_id")
+  routeSheetId   String?               @map("route_sheet_id")
+  requestedById  String                @map("requested_by_id")
+  status         MaterialRequestStatus @default(PENDING)
+  notes          String?
+  deliveredAt    DateTime?             @map("delivered_at")
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  routeSheet   RouteSheet?  @relation(fields: [routeSheetId], references: [id], onDelete: SetNull)
+  requestedBy  User         @relation("MaterialRequestRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+
+  items MaterialRequestItem[]
+
+  @@index([serviceOrderId])
+  @@index([routeSheetId])
+  @@index([requestedById])
+  @@index([status])
+  @@map("material_requests")
+}
+
+/// Línea de solicitud. Puede referenciar un ítem de almacén o
+/// describir un repuesto que hay que pedir a Procura.
+model MaterialRequestItem {
+  id                String                    @id @default(cuid())
+  materialRequestId String                    @map("material_request_id")
+  inventoryItemId   String?                   @map("inventory_item_id")
+  description       String?
+  quantity          Int                       @default(1)
+  unit              String?
+  status            MaterialRequestItemStatus @default(PENDING)
+  purchaseNotes     String?                   @map("purchase_notes")
+  deliveredAt       DateTime?                 @map("delivered_at")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  materialRequest MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem?  @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+
+  @@index([materialRequestId])
+  @@index([inventoryItemId])
+  @@index([status])
+  @@map("material_request_items")
+}
+
+/// Préstamo de equipamiento. Tiene varias líneas.
+model Loan {
+  id             String     @id @default(cuid())
+  loanNumber     String     @unique @map("loan_number")
+  receivedById   String     @map("received_by_id")
+  authorizedById String     @map("authorized_by_id")
+  serviceOrderId String?    @map("service_order_id")
+  status         LoanStatus @default(ACTIVE)
+  loanedAt       DateTime   @default(now()) @map("loaned_at")
+  dueAt          DateTime?  @map("due_at")
+  returnedAt     DateTime?  @map("returned_at")
+  notes          String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  receivedBy   User          @relation("LoanReceivedBy", fields: [receivedById], references: [id], onDelete: Restrict)
+  authorizedBy User          @relation("LoanAuthorizedBy", fields: [authorizedById], references: [id], onDelete: Restrict)
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+
+  items LoanItem[]
+
+  @@index([receivedById])
+  @@index([authorizedById])
+  @@index([serviceOrderId])
+  @@index([status])
+  @@map("loans")
+}
+
+/// Línea del préstamo: cantidad de un consumible o una unidad serializada.
+model LoanItem {
+  id                String  @id @default(cuid())
+  loanId            String  @map("loan_id")
+  inventoryItemId   String? @map("inventory_item_id")
+  inventoryUnitId   String? @map("inventory_unit_id")
+  quantity          Int     @default(1)
+  returnedQuantity  Int     @default(0) @map("returned_quantity")
+  conditionOnReturn String? @map("condition_on_return")
+  notes             String?
+
+  loan          Loan           @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  inventoryUnit InventoryUnit? @relation(fields: [inventoryUnitId], references: [id], onDelete: SetNull)
+
+  @@index([loanId])
+  @@index([inventoryItemId])
+  @@index([inventoryUnitId])
+  @@map("loan_items")
+}
+
+/// Calibración de una unidad serializada.
+model Calibration {
+  id              String            @id @default(cuid())
+  inventoryUnitId String            @map("inventory_unit_id")
+  performedAt     DateTime          @default(now()) @map("performed_at")
+  nextDueAt       DateTime?         @map("next_due_at")
+  result          CalibrationResult
+  certificateUrl  String?           @map("certificate_url")
+  performedById   String            @map("performed_by_id")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  inventoryUnit InventoryUnit @relation(fields: [inventoryUnitId], references: [id], onDelete: Cascade)
+  performedBy   User          @relation("CalibrationPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([inventoryUnitId])
+  @@index([performedById])
+  @@index([nextDueAt])
+  @@map("calibrations")
+}
+
+// ============================================================
+// CONTROL, AUDITORÍA E IA
+// ============================================================
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String?     @map("user_id")
+  action    AuditAction
+  entity    String
+  entityId  String      @map("entity_id")
+  changes   Json?
+  ipAddress String?     @map("ip_address")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Borrador de hoja de ruta sugerido por IA. Nunca se ejecuta solo:
+/// el ingeniero y la gerencia deben revisarlo y aprobarlo.
+model AiRouteSheetSuggestion {
+  id             String             @id @default(cuid())
+  serviceOrderId String             @map("service_order_id")
+  requestedById  String             @map("requested_by_id")
+  prompt         String
+  response       Json
+  provider       String?
+  model          String?
+  status         AiSuggestionStatus @default(DRAFT)
+  acceptedById   String?            @map("accepted_by_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("AiSuggestionRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  acceptedBy   User?        @relation("AiSuggestionAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([serviceOrderId])
+  @@index([requestedById])
+  @@index([acceptedById])
+  @@map("ai_route_sheet_suggestions")
 }

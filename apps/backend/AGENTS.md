@@ -31,3 +31,18 @@ When a task depends on how the app behaves in production - an error users hit, a
 
 - The Observe MCP server answers those questions directly: errors with their traces and logs, slow operations, jobs, and what a release changed (`find_regressions`, `diff_release`). It is included on the Pro plan and above. In Claude Code: `claude mcp add observe --transport http https://observe-api.nestjs.com/mcp`, and the client opens a browser to approve. Other clients: https://www.observe.nestjs.com/documentation/mcp
 - Without it, the user can open the request or error in the Observe dashboard and click **Copy agent prompt**, which hands over that page's trace, stack and logs as text.
+
+## Respuestas HTTP de TurboPre
+
+- `ResponseInterceptor` (global, registrado con `APP_INTERCEPTOR`) envuelve toda
+  respuesta exitosa en `{ success: true, statusCode, message, data }`.
+- `AllExceptionsFilter` (global, registrado con `APP_FILTER`) devuelve el mismo
+  sobre con `success: false` y nunca expone stack traces ni mensajes internos de
+  Prisma. Los detalles seguros van en `data` (por ejemplo, `data.errors`).
+- Personaliza el mensaje de éxito con `@ApiMessage('...')` desde
+  `src/common/decorators/api-message.decorator.ts`.
+- No devuelvas el sobre manualmente: devuelve el dato y deja que el interceptor
+  lo envuelva. Si un handler necesita el sobre completo, el interceptor detecta
+  que ya viene envuelto y no lo duplica.
+- Los contratos `ApiSuccess<T>` y `ApiError` viven en `@turbopre/shared`.
+

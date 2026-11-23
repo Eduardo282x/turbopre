@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
-import { AuthController, JwtAuthGuard } from './auth.controller.js';
+import { AuthController } from './auth.controller.js';
+import { JwtAuthGuard } from './auth.guard.js';
 import { AuthService } from './auth.service.js';
 
 const DEV_SECRET = 'turbopre-dev-secret-cambiar-en-produccion-32';
@@ -20,5 +21,6 @@ const DEV_SECRET = 'turbopre-dev-secret-cambiar-en-produccion-32';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard],
+  exports: [JwtAuthGuard, AuthService],
 })
 export class AuthModule {}

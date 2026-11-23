@@ -1,44 +1,60 @@
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { Pool, PoolConfig } from 'pg';
 
 /**
  * Cliente Prisma con inicialización perezosa: la aplicación arranca aunque la
  * base de datos todavía no esté configurada (modo demo del login).
  */
 @Injectable()
-export class PrismaService implements OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
-  private client: PrismaClient | null = null;
+  private readonly pool: Pool;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(config: ConfigService) {
+    const poolLogger = new Logger('PrismaPool');
 
-  get isConfigured(): boolean {
-    return Boolean(this.config.get<string>('DATABASE_URL'));
+    const poolConfig: PoolConfig = {
+      connectionString: config.getOrThrow<string>('DATABASE_URL'),
+      max: Number(config.get('DB_POOL_MAX') ?? 20),
+      min: Number(config.get('DB_POOL_MIN') ?? 2),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
+      maxUses: 10_000,
+    };
+
+    const pool = new Pool(poolConfig);
+
+    // Sin este listener, un cliente idle que muere (reinicio de Postgres,
+    // idle_session_timeout) emite 'error' y Node CRASHEA el proceso.
+    pool.on('error', (err) => {
+      poolLogger.error(`Error en cliente idle del pool: ${err.message}`);
+    });
+
+    super({
+      adapter: new PrismaPg(pool),
+      transactionOptions: { timeout: 10_000, maxWait: 5_000 },
+      log: [
+        { emit: 'event', level: 'warn' },
+        { emit: 'event', level: 'error' },
+      ],
+    });
+
+    this.pool = pool;
   }
 
-  get db(): PrismaClient {
-    if (!this.client) {
-      const connectionString = this.config.get<string>('DATABASE_URL');
-
-      if (!connectionString) {
-        throw new Error(
-          'DATABASE_URL no está configurada. Copia apps/backend/.env.example a .env y define la conexión a PostgreSQL.',
-        );
-      }
-
-      this.client = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
-      this.logger.log('Cliente Prisma inicializado');
-    }
-
-    return this.client;
+  /** Conexión eagerly: valida credenciales en el arranque, no en la 1ª petición. */
+  async onModuleInit(): Promise<void> {
+    await this.$connect();
+    this.logger.log('Prisma conectado a PostgreSQL');
   }
 
+  /** Cierre limpio. Evita connection leaks (requiere app.enableShutdownHooks()). */
   async onModuleDestroy(): Promise<void> {
-    if (this.client) {
-      await this.client.$disconnect();
-      this.client = null;
-    }
+    await this.$disconnect();
+    await this.pool.end();
+    this.logger.log('Pool de PostgreSQL cerrado correctamente');
   }
 }
