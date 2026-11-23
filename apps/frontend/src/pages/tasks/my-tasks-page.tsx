@@ -1,157 +1,253 @@
-import { CheckCircle2, ClipboardList, Clock3, Lock, Play } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRight, CheckCircle2, ClipboardCheck, ClipboardList, Lock, Play, Timer } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { PhaseStatusBadge, RouteStatusBadge } from '@/components/common/badges';
+import {
+  InspectionStatusBadge,
+  RouteStatusBadge,
+} from '@/components/common/badges';
+import { EmptyState } from '@/components/common/empty-state';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
-import { DataTable } from '@/components/table-kit/table';
-import type { DataTableColumn } from '@/components/table-kit/types';
+import { ProgressBar } from '@/components/common/progress-bar';
+import { CompleteTaskDialog } from '@/components/tasks/complete-task-dialog';
+import { TaskList } from '@/components/tasks/task-list';
 import { Button } from '@/components/ui/button';
-import { AREA_BY_ID, PHASE_TYPE_LABELS } from '@/features/preview/config';
-import { getMyTasks, type PhaseWithContext } from '@/features/preview/store/selectors';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  getMyTasks,
+  getProgress,
+  getRouteSheetsWithRelations,
+  isTaskMine,
+} from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { Phase } from '@/features/preview/types';
+import type { Task, TaskWithContext } from '@/features/preview/types';
 import { formatDate } from '@/lib/formatters';
-import { canCompletePhase } from '@/lib/permissions';
-import { CompletePhaseDialog } from '@/pages/route-sheets/complete-phase-dialog';
+import { canCompleteTask } from '@/lib/permissions';
+
+interface Group {
+  key: string;
+  kind: 'route' | 'inspection';
+  title: string;
+  subtitle: string;
+  href: string;
+  status: string;
+  tasks: Task[];
+  dueDate?: string;
+}
 
 export function MyTasksPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const completePhase = usePreviewStore((state) => state.completePhase);
-  const [context, setContext] = useState<PhaseWithContext | null>(null);
+  const completeTask = usePreviewStore((state) => state.completeTask);
+  const [context, setContext] = useState<TaskWithContext | null>(null);
   const [open, setOpen] = useState(false);
+
+  const myTasks = useMemo(() => (user ? getMyTasks(db, user) : []), [db, user]);
+  const groups = useMemo(() => {
+    const map = new Map<string, Group>();
+    myTasks.forEach((item) => {
+      if (item.routeSheet) {
+        const key = `route-${item.routeSheet.id}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            kind: 'route',
+            title: item.routeSheet.code,
+            subtitle: `${item.client?.name ?? 'Sin cliente'} · ${item.asset?.manufacturer} ${item.asset?.model}`,
+            href: `/hojas-de-ruta/${item.routeSheet.id}`,
+            status: item.routeSheet.status,
+            tasks: item.routeSheet.tasks,
+            dueDate: item.routeSheet.dueDate,
+          });
+        }
+      } else if (item.inspection) {
+        const key = `inspection-${item.inspection.id}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            kind: 'inspection',
+            title: item.inspection.code,
+            subtitle: `${item.client?.name ?? 'Sin cliente'} · ${item.asset?.manufacturer} ${item.asset?.model}`,
+            href: `/taller/inspecciones/${item.inspection.id}`,
+            status: item.inspection.status,
+            tasks: item.inspection.tasks,
+          });
+        }
+      }
+    });
+    return [...map.values()];
+  }, [myTasks]);
 
   if (!user) return null;
 
-  const tasks = getMyTasks(db, user);
-  const inProgress = tasks.filter((task) => task.phase.status === 'IN_PROGRESS').length;
-  const pending = tasks.filter((task) => task.phase.status === 'PENDING').length;
-  const blocked = tasks.filter((task) => task.phase.status === 'BLOCKED').length;
+  const routeGroups = groups.filter((group) => group.kind === 'route');
+  const inspectionGroups = groups.filter((group) => group.kind === 'inspection');
+  const completedRoutes = getRouteSheetsWithRelations(db).filter(
+    (route) =>
+      route.progress === 100 &&
+      route.tasks.some((task) => isTaskMine(task, user)) &&
+      !groups.some((group) => group.key === `route-${route.id}`),
+  );
+  const pending = myTasks.filter((item) => item.task.status === 'PENDING').length;
+  const inProgress = myTasks.filter((item) => item.task.status === 'IN_PROGRESS').length;
+  const blocked = myTasks.filter((item) => item.task.status === 'BLOCKED').length;
 
-  const openComplete = (task: PhaseWithContext) => {
-    setContext(task);
+  const openComplete = (task: Task) => {
+    const item = myTasks.find((candidate) => candidate.task.id === task.id);
+    if (!item) return;
+    setContext(item);
     setOpen(true);
   };
 
-  const columns: DataTableColumn<PhaseWithContext>[] = [
-    {
-      id: 'route',
-      header: 'Hoja de ruta',
-      cell: (task) => (
-        <div className="min-w-0">
-          <p className="font-semibold text-foreground">{task.route.code}</p>
-          <p className="max-w-56 truncate text-xs text-muted-foreground">{task.component.name}</p>
-          <p className="text-[11px] text-muted-foreground/70">{task.client?.name ?? 'Sin cliente'}</p>
-        </div>
-      ),
-      sortable: true,
-      sortValue: (task) => task.route.code,
-    },
-    {
-      id: 'part',
-      header: 'Parte',
-      cell: (task) => <span className="text-sm">{task.part.name}</span>,
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (task) => task.part.name,
-    },
-    {
-      id: 'phase',
-      header: 'Fase',
-      cell: (task) => (
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{task.phase.name}</p>
-          <p className="text-xs text-muted-foreground">{PHASE_TYPE_LABELS[task.phase.type]} · Paso {task.phase.order}</p>
-        </div>
-      ),
-      sortable: true,
-      sortValue: (task) => task.phase.name,
-    },
-    {
-      id: 'area',
-      header: 'Área',
-      cell: (task) => <span className="text-xs">{AREA_BY_ID[task.phase.areaId].shortName}</span>,
-      hideOnMobile: true,
-    },
-    {
-      id: 'status',
-      header: 'Estado',
-      cell: (task) => <PhaseStatusBadge status={task.phase.status} />,
-      sortable: true,
-      sortValue: (task) => task.phase.status,
-    },
-    {
-      id: 'routeStatus',
-      header: 'Hoja',
-      cell: (task) => <RouteStatusBadge status={task.route.status} />,
-      hideOnMobile: true,
-    },
-    {
-      id: 'due',
-      header: 'Entrega',
-      cell: (task) => <span className="text-xs text-muted-foreground">{formatDate(task.route.dueDate)}</span>,
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (task) => new Date(task.route.dueDate),
-    },
-  ];
+  const renderGroup = (group: Group) => {
+    const progress = getProgress(group.tasks);
+    return (
+      <Card key={group.key} className="border-border/80 bg-card/80 py-0">
+        <CardContent className="space-y-4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-heading text-base font-semibold text-foreground">{group.title}</p>
+                {group.kind === 'route' ? (
+                  <RouteStatusBadge status={group.status as never} />
+                ) : (
+                  <InspectionStatusBadge status={group.status as never} />
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{group.subtitle}</p>
+              {group.dueDate && (
+                <p className="mt-1 text-[11px] text-muted-foreground">Entrega: {formatDate(group.dueDate)}</p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={group.href}>
+                Abrir hoja completa <ArrowRight />
+              </Link>
+            </Button>
+          </div>
+
+          <ProgressBar
+            value={progress.progress}
+            label={`${progress.completed} de ${progress.total} tareas completadas`}
+          />
+
+          <TaskList
+            tasks={group.tasks}
+            canComplete={(task) => canCompleteTask(user, task)}
+            onComplete={openComplete}
+          />
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ejecución"
         title="Mis tareas"
-        description="Fases asignadas a tu área o rol. Completa solo las que estén desbloqueadas y adjunta evidencia."
+        description="Se muestra la hoja completa. Solo tus tareas de la etapa activa tienen el botón para marcar listo."
         actions={
-          <Button variant="outline" asChild>
-            <Link to="/hojas-de-ruta">
-              <ClipboardList /> Ver hojas de ruta
-            </Link>
-          </Button>
+          user.role === 'ENGINEERING' || user.role === 'QUALITY' ? (
+            <Button variant="outline" asChild>
+              <Link to="/hojas-de-ruta">
+                <ClipboardList /> Ver hojas de ruta
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Pendientes" value={pending} hint="Listas para comenzar" icon={Clock3} tone="warning" />
-        <KpiCard label="En proceso" value={inProgress} hint="Fases activas" icon={Play} tone="accent" />
-        <KpiCard label="Bloqueadas" value={blocked} hint="Esperan la fase anterior" icon={Lock} tone="danger" />
+        <KpiCard label="Pendientes" value={pending} hint="Listas para comenzar" icon={Timer} tone="warning" />
+        <KpiCard label="En proceso" value={inProgress} hint="Tareas activas" icon={Play} tone="accent" />
+        <KpiCard label="Bloqueadas" value={blocked} hint="Esperan la etapa anterior" icon={Lock} tone="danger" />
       </div>
 
-      <DataTable
-        data={tasks}
-        columns={columns}
-        getRowId={(task) => task.phase.id}
-        search={{
-          placeholder: 'Buscar por hoja, componente, parte o fase…',
-          getText: (task) =>
-            `${task.route.code} ${task.component.name} ${task.part.name} ${task.phase.name} ${task.client?.name ?? ''}`,
-        }}
-        actions={[
-          {
-            label: 'Completar fase',
-            icon: CheckCircle2,
-            hidden: (task: PhaseWithContext) =>
-              !canCompletePhase(user, task.phase as Phase) || task.phase.status === 'BLOCKED',
-            onSelect: openComplete,
-          },
-        ]}
-        pageSize={10}
-        emptyTitle="¡Todo al día!"
-        emptyDescription="No hay tareas pendientes para tu área en este momento."
-        caption="Tareas asignadas al usuario"
-      />
+      {myTasks.length === 0 && completedRoutes.length === 0 ? (
+        <EmptyState
+          icon={CheckCircle2}
+          title="¡Todo al día!"
+          description="No tienes tareas pendientes en este momento."
+        />
+      ) : (
+        <div className="space-y-8">
+          {routeGroups.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="size-4 text-primary" />
+                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Hojas de ruta activas
+                </h2>
+              </div>
+              {routeGroups.map(renderGroup)}
+            </section>
+          )}
 
-      <CompletePhaseDialog
+          {inspectionGroups.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="size-4 text-info" />
+                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Inspecciones
+                </h2>
+              </div>
+              {inspectionGroups.map(renderGroup)}
+            </section>
+          )}
+
+          {myTasks.length === 0 && (
+            <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+              No tienes tareas pendientes. Abajo puedes revisar las hojas completadas donde participaste.
+            </p>
+          )}
+
+          {completedRoutes.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 text-success" />
+                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Hojas completadas donde participé
+                </h2>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {completedRoutes.map((route) => (
+                  <div key={route.id} className="rounded-xl border border-border/70 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground">{route.code}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {route.client?.name} · {route.asset?.model}
+                        </p>
+                      </div>
+                      <RouteStatusBadge status={route.status} />
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {route.completedTasks} tareas · {route.qualityApprovedAt ? 'Calidad aprobada' : 'Pendiente de calidad'}
+                    </p>
+                    <Button variant="outline" size="sm" asChild className="mt-3 w-full">
+                      <Link to={`/hojas-de-ruta/${route.id}`}>
+                        Ver hoja completa <ArrowRight />
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      <CompleteTaskDialog
         open={open}
         onOpenChange={setOpen}
         context={context}
         onSubmit={(payload) => {
           if (!context) return;
-          completePhase(context.phase.id, user.id, payload);
-          toast.success('Fase completada con evidencia');
+          completeTask(context.task.id, user.id, payload);
+          toast.success('Tarea marcada como lista. La etapa siguiente se desbloqueó.');
         }}
       />
     </div>

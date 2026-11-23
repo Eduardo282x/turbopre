@@ -30,9 +30,6 @@ services:
         value: "24"
       - key: NODE_ENV
         value: production
-      # El login demo debe quedar deshabilitado en QA.
-      - key: AUTH_DEMO
-        value: "false"
       # Render los pide al sincronizar el Blueprint (sync: false).
       - key: JWT_SECRET
         sync: false

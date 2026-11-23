@@ -1,10 +1,20 @@
-import { CheckCircle2, ClipboardCheck, Clock3, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  FileText,
+  Plus,
+  Timer,
+  XCircle,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { PhaseStatusBadge, RouteStatusBadge } from '@/components/common/badges';
-import { FormDialog } from '@/components/common/form-dialog';
+import { InspectionStatusBadge } from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
+import { ProgressBar } from '@/components/common/progress-bar';
+import { SectionCard } from '@/components/common/section-card';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
 import { Button } from '@/components/ui/button';
@@ -15,223 +25,223 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AREA_BY_ID } from '@/features/preview/config';
-import { getPhaseContexts, type PhaseWithContext } from '@/features/preview/store/selectors';
+import { INSPECTION_STATUS_META } from '@/features/preview/config';
+import {
+  getApprovedInspectionsWithoutRoute,
+  getInspectionMetrics,
+  getInspectionsForWorkshop,
+} from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import type { InspectionWithRelations, NewInspectionInput } from '@/features/preview/types';
 import { formatDate } from '@/lib/formatters';
-import { canCompletePhase } from '@/lib/permissions';
-import { AddInspectionDialog } from '@/pages/route-sheets/add-inspection-dialog';
-import { CompletePhaseDialog } from '@/pages/route-sheets/complete-phase-dialog';
+import { canCreateInspection, canManageRoutes } from '@/lib/permissions';
+import { InspectionFormDialog } from './inspection-form-dialog';
 
 export function InspectionsPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const addInspectionPhase = usePreviewStore((state) => state.addInspectionPhase);
-  const completePhase = usePreviewStore((state) => state.completePhase);
-  const [routeSelectOpen, setRouteSelectOpen] = useState(false);
-  const [routeId, setRouteId] = useState('');
-  const [inspectionRouteId, setInspectionRouteId] = useState<string | null>(null);
-  const [inspectionOpen, setInspectionOpen] = useState(false);
-  const [context, setContext] = useState<PhaseWithContext | null>(null);
-  const [completeOpen, setCompleteOpen] = useState(false);
+  const createInspection = usePreviewStore((state) => state.createInspection);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [formOpen, setFormOpen] = useState(false);
+  const [defaultOrderId, setDefaultOrderId] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    const orderId = searchParams.get('ods');
+    if (!orderId) return;
+    setDefaultOrderId(orderId);
+    setFormOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const inspections = getInspectionsForWorkshop(db);
+  const filtered = useMemo(
+    () => inspections.filter((inspection) => statusFilter === 'all' || inspection.status === statusFilter),
+    [inspections, statusFilter],
+  );
 
   if (!user) return null;
 
-  const inspectionContexts = getPhaseContexts(db).filter(
-    (contextItem) => contextItem.phase.type === 'INSPECTION',
-  );
-  const pending = inspectionContexts.filter((item) => item.phase.status === 'PENDING').length;
-  const inProgress = inspectionContexts.filter((item) => item.phase.status === 'IN_PROGRESS').length;
-  const completed = inspectionContexts.filter((item) => item.phase.status === 'COMPLETED').length;
+  const metrics = getInspectionMetrics(db);
+  const approvedPending = getApprovedInspectionsWithoutRoute(db);
 
-  const candidateRoutes = db.routeSheets.filter((route) =>
-    ['APPROVED', 'IN_PROGRESS', 'IN_QUALITY'].includes(route.status),
-  );
-  const inspectionRoute = inspectionRouteId
-    ? db.routeSheets.find((route) => route.id === inspectionRouteId)
-    : undefined;
-  const inspectionParts = inspectionRoute
-    ? db.parts.filter((part) => part.routeSheetId === inspectionRoute.id)
-    : [];
-
-  const openComplete = (item: PhaseWithContext) => {
-    setContext(item);
-    setCompleteOpen(true);
-  };
-
-  const columns: DataTableColumn<PhaseWithContext>[] = [
+  const columns: DataTableColumn<InspectionWithRelations>[] = [
     {
-      id: 'route',
-      header: 'Hoja de ruta',
-      cell: (item) => (
-        <div className="min-w-0">
-          <p className="font-semibold text-foreground">{item.route.code}</p>
-          <p className="max-w-56 truncate text-xs text-muted-foreground">{item.component.name}</p>
-          <p className="text-[11px] text-muted-foreground/70">{item.client?.name ?? 'Sin cliente'}</p>
-        </div>
-      ),
-      sortable: true,
-      sortValue: (item) => item.route.code,
-    },
-    {
-      id: 'part',
-      header: 'Parte',
-      cell: (item) => <span className="text-sm">{item.part.name}</span>,
-      hideOnMobile: true,
-    },
-    {
-      id: 'phase',
+      id: 'inspection',
       header: 'Inspección',
-      cell: (item) => (
+      cell: (inspection) => (
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">{item.phase.name}</p>
-          <p className="max-w-64 truncate text-xs text-muted-foreground">{item.phase.description}</p>
+          <p className="font-semibold text-foreground">{inspection.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">ODS {inspection.serviceOrder.code}</p>
         </div>
       ),
       sortable: true,
-      sortValue: (item) => item.phase.name,
+      sortValue: (inspection) => inspection.code,
     },
     {
-      id: 'area',
-      header: 'Área',
-      cell: (item) => <span className="text-xs">{AREA_BY_ID[item.phase.areaId].shortName}</span>,
+      id: 'client',
+      header: 'Cliente / equipo',
+      cell: (inspection) => (
+        <div className="text-xs">
+          <p className="font-medium text-foreground">{inspection.client?.name ?? '—'}</p>
+          <p className="text-muted-foreground">
+            {inspection.asset?.manufacturer} {inspection.asset?.model} · {inspection.asset?.tag}
+          </p>
+        </div>
+      ),
       hideOnMobile: true,
     },
     {
       id: 'status',
       header: 'Estado',
-      cell: (item) => <PhaseStatusBadge status={item.phase.status} />,
+      cell: (inspection) => <InspectionStatusBadge status={inspection.status} />,
       sortable: true,
-      sortValue: (item) => item.phase.status,
+      sortValue: (inspection) => inspection.status,
     },
     {
-      id: 'routeStatus',
-      header: 'Hoja',
-      cell: (item) => <RouteStatusBadge status={item.route.status} />,
-      hideOnMobile: true,
-    },
-    {
-      id: 'date',
-      header: 'Fecha',
-      cell: (item) => (
-        <span className="text-xs text-muted-foreground">
-          {item.phase.completedAt ? formatDate(item.phase.completedAt) : 'Pendiente'}
-        </span>
+      id: 'progress',
+      header: 'Tareas',
+      cell: (inspection) => (
+        <ProgressBar
+          value={inspection.progress}
+          label={`${inspection.completedTasks} de ${inspection.totalTasks}`}
+          className="w-36"
+        />
       ),
       hideOnMobile: true,
+    },
+    {
+      id: 'created',
+      header: 'Creada',
+      cell: (inspection) => (
+        <div className="text-xs text-muted-foreground">
+          <p>{formatDate(inspection.createdAt)}</p>
+          <p>{inspection.creator.name}</p>
+        </div>
+      ),
+      hideOnMobile: true,
+      sortable: true,
+      sortValue: (inspection) => new Date(inspection.createdAt),
     },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Taller"
+        eyebrow="Servicio de taller"
         title="Inspecciones"
-        description="Fases de inspección asignadas a las áreas, con hallazgos y evidencia fotográfica."
+        description="Taller recibe la ODS y crea las tareas de inspección por proceso, puesto y etapa. Calidad participa siempre."
         actions={
-          <Button
-            onClick={() => {
-              setRouteId(candidateRoutes[0]?.id ?? '');
-              setRouteSelectOpen(true);
-            }}
-          >
-            <Plus /> Nueva inspección
-          </Button>
+          canCreateInspection(user) ? (
+            <Button
+              onClick={() => {
+                setDefaultOrderId(undefined);
+                setFormOpen(true);
+              }}
+            >
+              <Plus /> Nueva inspección
+            </Button>
+          ) : undefined
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Pendientes" value={pending} hint="Esperando ejecución" icon={Clock3} tone="warning" />
-        <KpiCard label="En proceso" value={inProgress} hint="Inspecciones activas" icon={Search} tone="accent" />
-        <KpiCard label="Completadas" value={completed} hint="Con evidencia registrada" icon={CheckCircle2} tone="success" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="Inspecciones" value={metrics.total} hint="Recibidas desde ODS" icon={ClipboardCheck} tone="accent" />
+        <KpiCard label="En ejecución" value={metrics.inProgress} hint="Tareas en curso" icon={Timer} tone="info" />
+        <KpiCard label="Aprobadas" value={metrics.approved} hint="Listas para Ingeniería" icon={CheckCircle2} tone="success" />
+        <KpiCard label="Rechazadas" value={metrics.rejected} hint="Requieren corrección" icon={XCircle} tone="danger" />
       </div>
 
+      {approvedPending.length > 0 && canManageRoutes(user) && (
+        <SectionCard
+          title="Inspecciones aprobadas pendientes de hoja de ruta"
+          description="Ingeniería puede crear la hoja de ruta. Los pasos de inspección se copiarán como realizados."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {approvedPending.map((inspection) => (
+              <div key={inspection.id} className="rounded-xl border border-border/70 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">{inspection.code}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {inspection.client?.name} · {inspection.asset?.model}
+                    </p>
+                  </div>
+                  <InspectionStatusBadge status={inspection.status} />
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {inspection.completedTasks} tareas de inspección completadas
+                </p>
+                <Button size="sm" asChild className="mt-3 w-full">
+                  <Link to={`/hojas-de-ruta/nueva?inspeccion=${inspection.id}`}>
+                    <FileText /> Crear hoja de ruta
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {metrics.completed > 0 && canCreateInspection(user) && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
+          <CheckCircle2 className="size-5 text-warning" />
+          <p className="flex-1 text-foreground">
+            Hay <strong>{metrics.completed}</strong> inspección(es) completada(s) esperando la aprobación de Taller.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setStatusFilter('COMPLETED')}>
+            Ver completadas
+          </Button>
+        </div>
+      )}
+
       <DataTable
-        data={inspectionContexts}
+        data={filtered}
         columns={columns}
-        getRowId={(item) => item.phase.id}
+        getRowId={(inspection) => inspection.id}
         search={{
-          placeholder: 'Buscar por hoja, componente, parte o área…',
-          getText: (item) =>
-            `${item.route.code} ${item.component.name} ${item.part.name} ${item.phase.name} ${AREA_BY_ID[item.phase.areaId].name}`,
+          placeholder: 'Buscar por inspección, ODS, cliente o equipo…',
+          getText: (inspection) =>
+            `${inspection.code} ${inspection.serviceOrder.code} ${inspection.client?.name ?? ''} ${inspection.asset?.model ?? ''}`,
         }}
+        filters={
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger size="sm" className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {Object.entries(INSPECTION_STATUS_META).map(([status, meta]) => (
+                <SelectItem key={status} value={status}>
+                  {meta.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
         actions={[
           {
-            label: 'Completar inspección',
-            icon: CheckCircle2,
-            hidden: (item) =>
-              !canCompletePhase(user, item.phase) ||
-              item.phase.status === 'COMPLETED' ||
-              item.phase.status === 'BLOCKED',
-            onSelect: openComplete,
+            label: 'Ver inspección',
+            icon: Eye,
+            onSelect: (inspection) => navigate(`/taller/inspecciones/${inspection.id}`),
           },
         ]}
+        onRowClick={(inspection) => navigate(`/taller/inspecciones/${inspection.id}`)}
         pageSize={10}
         emptyTitle="Sin inspecciones"
-        emptyDescription="Crea una inspección adicional desde una hoja de ruta aprobada."
+        emptyDescription="Taller puede crear una inspección desde una orden de servicio."
         caption="Inspecciones de taller"
       />
 
-      <FormDialog
-        open={routeSelectOpen}
-        onOpenChange={setRouteSelectOpen}
-        title="Seleccionar hoja de ruta"
-        description="Elige el expediente al que pertenecerá la inspección."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setRouteSelectOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                if (!routeId) {
-                  toast.error('Selecciona una hoja de ruta');
-                  return;
-                }
-                setInspectionRouteId(routeId);
-                setRouteSelectOpen(false);
-                setInspectionOpen(true);
-              }}
-            >
-              <ClipboardCheck /> Continuar
-            </Button>
-          </>
-        }
-      >
-        <Select value={routeId} onValueChange={setRouteId}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Selecciona una hoja de ruta" />
-          </SelectTrigger>
-          <SelectContent>
-            {candidateRoutes.map((route) => (
-              <SelectItem key={route.id} value={route.id}>
-                {route.code} · {db.components.find((component) => component.id === route.componentId)?.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormDialog>
-
-      <AddInspectionDialog
-        open={inspectionOpen}
-        onOpenChange={setInspectionOpen}
-        parts={inspectionParts}
-        onSubmit={(input) => {
-          if (!inspectionRouteId) return;
-          addInspectionPhase(inspectionRouteId, input.partId, input.areaId, user.id, input.description);
-          toast.success('Inspección creada');
-        }}
-      />
-
-      <CompletePhaseDialog
-        open={completeOpen}
-        onOpenChange={setCompleteOpen}
-        context={context}
-        onSubmit={(payload) => {
-          if (!context) return;
-          completePhase(context.phase.id, user.id, payload);
-          toast.success('Inspección completada');
+      <InspectionFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        defaultOrderId={defaultOrderId}
+        onSubmit={(input: NewInspectionInput) => {
+          createInspection(input, user.id);
+          toast.success('Inspección creada y tareas asignadas');
         }}
       />
     </div>

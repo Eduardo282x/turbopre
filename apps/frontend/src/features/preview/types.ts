@@ -1,64 +1,100 @@
+/**
+ * Modelo provisional del frontend CAMI (modo preview).
+ *
+ * La espina dorsal es:
+ *   Orden de servicio (ODS) → Inspección → Hoja de ruta → Anexos → Calidad → Entrega
+ *
+ * No define el esquema definitivo de Prisma. Cuando se conecte el backend, estos
+ * tipos se reemplazan por los contratos de packages/shared + services/<dominio>.
+ */
+
 export type RoleId =
   | 'GLOBAL'
-  | 'PLANNING'
-  | 'ENGINEERING'
   | 'SALES'
   | 'WORKSHOP'
+  | 'ENGINEERING'
   | 'OPERATOR'
-  | 'WAREHOUSE'
   | 'QUALITY'
-  | 'FIELD'
   | 'PROJECT'
-  | 'NDT'
-  | 'METROLOGY'
-  | 'HSE'
-  | 'PROCUREMENT'
-  | 'SECTION_CHIEF';
+  | 'WAREHOUSE';
 
-export type AreaId =
-  | 'planning'
-  | 'engineering'
-  | 'turbines'
-  | 'welding'
+export type ProcessId =
+  | 'rotating'
   | 'machining'
   | 'generators'
-  | 'workshop'
-  | 'warehouse'
-  | 'quality'
-  | 'sales'
-  | 'assembly'
-  | 'machining_major'
-  | 'machining_minor'
-  | 'balancing'
-  | 'special_welding'
-  | 'generator_shop'
-  | 'thermal_coatings'
-  | 'metrology'
-  | 'material_warehouse'
-  | 'admin'
-  | 'field_gas'
-  | 'field_steam'
-  | 'field_generator'
-  | 'field_engineering'
-  | 'projects'
-  | 'supply';
+  | 'welding'
+  | 'engineering'
+  | 'quality';
+
+export type PositionId =
+  | 'rotating_specialist'
+  | 'rotating_mechanic_1'
+  | 'rotating_mechanic_2'
+  | 'lifting_operator'
+  | 'abrasive_operator'
+  | 'winder_1'
+  | 'winder_2'
+  | 'welder_fi'
+  | 'welder_1'
+  | 'welder_2'
+  | 'machine_operator_1'
+  | 'machine_operator_2'
+  | 'deburrer'
+  | 'eng_plans'
+  | 'eng_pmi'
+  | 'eng_sample_cut'
+  | 'eng_metallography'
+  | 'quality_inspector';
+
+export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type TaskStatus = 'BLOCKED' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type TaskSource = 'INSPECTION' | 'ROUTE';
+
+export type InspectionStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
 
 export type RouteStatus =
   | 'DRAFT'
-  | 'IN_REVIEW'
+  | 'PENDING_APPROVAL'
   | 'APPROVED'
   | 'IN_PROGRESS'
+  | 'IN_ANNEXES'
   | 'IN_QUALITY'
   | 'READY_FOR_DELIVERY'
   | 'DELIVERED';
 
-export type PhaseStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED';
-export type PhaseType = 'WORK' | 'INSPECTION' | 'QUALITY';
-export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type PartStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-export type SparePartStatus = 'PENDING' | 'APPROVED' | 'DISPATCHED';
+export type ServiceOrderStatus =
+  | 'RECEIVED'
+  | 'IN_INSPECTION'
+  | 'INSPECTION_APPROVED'
+  | 'IN_ROUTE'
+  | 'IN_EXECUTION'
+  | 'IN_ANNEXES'
+  | 'IN_QUALITY'
+  | 'READY_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export type SpareItemStatus = 'PENDING' | 'APPROVED' | 'DISPATCHED' | 'IN_PROCURE' | 'RECEIVED';
+export type SpareDestination = 'WAREHOUSE' | 'PROCURE';
+
 export type InventoryStatus = 'AVAILABLE' | 'LOANED' | 'OUT_OF_STOCK';
 export type LoanStatus = 'ACTIVE' | 'RETURNED';
+
+export type AssetType =
+  | 'GAS_TURBINE'
+  | 'STEAM_TURBINE'
+  | 'GENERATOR'
+  | 'COMPRESSOR'
+  | 'AUXILIARY';
+
+export type ProjectPhase =
+  | 'ENGINEERING'
+  | 'PROCUREMENT'
+  | 'CONSTRUCTION'
+  | 'COMMISSIONING'
+  | 'CLOSED';
+
 export type AuditAction =
   | 'CREATE'
   | 'UPDATE'
@@ -71,97 +107,19 @@ export type AuditAction =
   | 'LOGIN'
   | 'RESET';
 
-export type ServiceMode = 'SHOP' | 'FIELD' | 'PROJECT' | 'SUPPLY';
-
-export type ServiceOrderStatus =
-  | 'RECEIVED'
-  | 'DIAGNOSIS'
-  | 'SCOPING'
-  | 'PLANNING'
-  | 'APPROVED'
-  | 'IN_EXECUTION'
-  | 'IN_QUALITY'
-  | 'READY_FOR_DELIVERY'
-  | 'DELIVERED'
-  | 'CLOSED'
-  | 'CANCELLED';
-
-export type AssetType =
-  | 'GAS_TURBINE'
-  | 'STEAM_TURBINE'
-  | 'GENERATOR'
-  | 'COMPRESSOR'
-  | 'CONTROL_SYSTEM'
-  | 'AUXILIARY';
-
-export type ServiceScope =
-  | 'COMBUSTION_INSPECTION'
-  | 'HOT_GAS_PATH'
-  | 'MAJOR_OVERHAUL'
-  | 'STEAM_ROTOR_REPAIR'
-  | 'STEAM_DIAPHRAGM_REPAIR'
-  | 'STEAM_CASING_REPAIR'
-  | 'GENERATOR_STATOR'
-  | 'GENERATOR_ROTOR_MINOR'
-  | 'GENERATOR_ROTOR_MAJOR'
-  | 'GENERATOR_REINSULATION'
-  | 'GENERATOR_REWIND'
-  | 'SHOP_MACHINING'
-  | 'SHOP_BALANCING'
-  | 'SHOP_WELDING'
-  | 'SHOP_COATING'
-  | 'SHOP_HEAT_TREATMENT'
-  | 'SHOP_ASSEMBLY'
-  | 'NDT'
-  | 'CONDITION_MONITORING'
-  | 'FIELD_PROJECT'
-  | 'SUPPLY_COMPONENTS'
-  | 'SUPPLY_CONTROL_SYSTEMS';
-
-export type QualityRecordType =
-  | 'NDT'
-  | 'ELECTRICAL'
-  | 'DIMENSIONAL'
-  | 'BALANCE'
-  | 'COATING'
-  | 'HEAT_TREATMENT'
-  | 'VISUAL'
-  | 'FINAL';
-
-export type QualityResult = 'PENDING' | 'PASS' | 'FAIL';
-export type NonConformitySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type NonConformityStatus = 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
-export type FieldJobStatus = 'PLANNED' | 'MOBILIZED' | 'IN_EXECUTION' | 'DEMOBILIZED' | 'CLOSED';
-export type ProjectPhase =
-  | 'ENGINEERING'
-  | 'PROCUREMENT'
-  | 'CONSTRUCTION'
-  | 'PRECOMMISSIONING'
-  | 'COMMISSIONING'
-  | 'CLOSED';
-export type SupplyStatus =
-  | 'REQUESTED'
-  | 'QUOTED'
-  | 'PURCHASED'
-  | 'INSPECTION'
-  | 'DISPATCHED'
-  | 'DELIVERED';
-
-export interface Area {
-  id: AreaId;
+export interface Process {
+  id: ProcessId;
   name: string;
   shortName: string;
-  group:
-    | 'planning'
-    | 'engineering'
-    | 'production'
-    | 'support'
-    | 'commercial'
-    | 'field'
-    | 'projects'
-    | 'supply'
-    | 'admin';
-  order: number;
+  group: 'workshop' | 'engineering' | 'quality';
+  color: string;
+}
+
+export interface Position {
+  id: PositionId;
+  name: string;
+  shortName: string;
+  processId: ProcessId;
   color: string;
 }
 
@@ -169,9 +127,10 @@ export interface User {
   id: string;
   name: string;
   username: string;
+  password: string;
   email: string;
   role: RoleId;
-  areaId?: AreaId;
+  positionId?: PositionId;
   active: boolean;
   createdAt: string;
 }
@@ -185,71 +144,124 @@ export interface Client {
   phone: string;
 }
 
-export interface Component {
+export interface Asset {
   id: string;
-  name: string;
+  clientId: string;
+  type: AssetType;
+  manufacturer: string;
+  model: string;
   serial: string;
-  type: string;
+  tag: string;
+  location: string;
+  notes?: string;
+}
+
+export interface ServiceOrder {
+  id: string;
+  code: string;
+  subCode: string;
+  clientId: string;
+  assetId: string;
+  equipmentCode: string;
+  description: string;
+  scope: string;
+  priority: Priority;
+  dueDate: string;
+  site: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  inspectionId?: string;
+  routeSheetId?: string;
+  observations?: string;
+  cancelledAt?: string;
+}
+
+export interface Inspection {
+  id: string;
+  code: string;
+  serviceOrderId: string;
+  status: InspectionStatus;
+  findings?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedReason?: string;
 }
 
 export interface RouteSheet {
   id: string;
   code: string;
-  componentId: string;
-  clientId?: string;
-  serviceOrderId?: string;
-  templateId?: string;
+  serviceOrderId: string;
+  inspectionId: string;
   description: string;
-  status: RouteStatus;
+  serial: string;
+  equipmentCode: string;
+  site: string;
+  scope: string;
   priority: Priority;
+  dueDate: string;
+  status: RouteStatus;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
-  dueDate: string;
-  createdBy: string;
+  preparedBy: string;
+  preparedAt: string;
   approvedBy?: string;
   approvedAt?: string;
+  rejectedReason?: string;
+  annexFinalizedBy?: string;
+  annexFinalizedAt?: string;
+  qualityApprovedBy?: string;
+  qualityApprovedAt?: string;
   deliveredAt?: string;
   observations?: string;
+  aiDraftUsed?: boolean;
 }
 
-export interface Part {
+export interface Task {
   id: string;
-  routeSheetId: string;
-  name: string;
-  quantity: number;
-  status: PartStatus;
-  areaId: AreaId;
-}
-
-export interface Phase {
-  id: string;
-  routeSheetId: string;
-  partId: string;
-  areaId: AreaId;
-  order: number;
-  name: string;
+  inspectionId?: string;
+  routeSheetId?: string;
+  source: TaskSource;
+  sourceTaskId?: string;
+  step: number;
+  stage: number;
+  processId: ProcessId;
+  positionId: PositionId;
+  assignedUserId?: string;
   description: string;
-  type: PhaseType;
-  status: PhaseStatus;
-  responsibleId?: string;
+  criteria?: string;
+  forms?: string;
+  status: TaskStatus;
+  evidence?: string;
+  observations?: string;
   startedAt?: string;
   completedAt?: string;
-  observations?: string;
-  evidence?: string;
+  completedBy?: string;
+  annexSelected?: boolean;
 }
 
-export interface SparePart {
+export interface SpareItem {
   id: string;
-  routeSheetId: string;
-  partId?: string;
   name: string;
   code: string;
   quantity: number;
-  areaId: AreaId;
-  status: SparePartStatus;
+  destination: SpareDestination;
+  status: SpareItemStatus;
+  available: boolean;
+}
+
+export interface SpareRequest {
+  id: string;
+  code: string;
+  routeSheetId: string;
   requestedBy: string;
   requestedAt: string;
-  dispatchedAt?: string;
+  items: SpareItem[];
+  notes?: string;
 }
 
 export interface InventoryItem {
@@ -265,7 +277,6 @@ export interface InventoryItem {
   controlledAtmosphere?: boolean;
   certificate?: string;
   calibrationDue?: string;
-  reservedForServiceOrderId?: string;
 }
 
 export interface Loan {
@@ -276,6 +287,26 @@ export interface Loan {
   loanedAt: string;
   returnedAt?: string;
   status: LoanStatus;
+}
+
+export interface ProjectMilestone {
+  id: string;
+  name: string;
+  phase: ProjectPhase;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+  date?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  clientId: string;
+  ownerId: string;
+  phase: ProjectPhase;
+  progress: number;
+  startDate: string;
+  dueDate: string;
+  milestones: ProjectMilestone[];
 }
 
 export interface AuditEntry {
@@ -289,186 +320,74 @@ export interface AuditEntry {
   createdAt: string;
 }
 
-export interface Asset {
-  id: string;
-  clientId: string;
-  type: AssetType;
-  manufacturer: string;
-  model: string;
-  serial: string;
-  tag: string;
-  ratedPower: string;
-  technology: string;
-  location: string;
-  notes?: string;
-}
-
-export interface ServiceOrder {
-  id: string;
-  code: string;
-  mode: ServiceMode;
-  status: ServiceOrderStatus;
-  clientId: string;
-  assetId: string;
-  site: string;
-  scope: ServiceScope;
-  description: string;
-  priority: Priority;
-  createdAt: string;
-  dueDate: string;
-  createdBy: string;
-  approvedBy?: string;
-  approvedAt?: string;
-  routeSheetId?: string;
-  observations?: string;
-}
-
-export interface FieldJob {
-  id: string;
-  serviceOrderId: string;
-  siteName: string;
-  location: string;
-  permits: string;
-  riskAnalysis: string;
-  crew: string[];
-  mobilizationDate?: string;
-  demobilizationDate?: string;
-  containers: number;
-  cranes: string;
-  status: FieldJobStatus;
-  report?: string;
-}
-
-export interface ProjectMilestone {
-  id: string;
-  name: string;
-  phase: ProjectPhase;
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-  date?: string;
-}
-
-export interface Project {
-  id: string;
-  serviceOrderId: string;
-  name: string;
-  phase: ProjectPhase;
-  progress: number;
-  milestones: ProjectMilestone[];
-}
-
-export interface SupplyItem {
-  id: string;
-  name: string;
-  code: string;
-  quantity: number;
-  status: SupplyStatus;
-}
-
-export interface SupplyOrder {
-  id: string;
-  serviceOrderId: string;
-  items: SupplyItem[];
-  status: SupplyStatus;
-  supplier?: string;
-  purchaseOrder?: string;
-  expectedDate?: string;
-  deliveredAt?: string;
-}
-
-export interface QualityRecord {
-  id: string;
-  serviceOrderId: string;
-  routeSheetId?: string;
-  phaseId?: string;
-  type: QualityRecordType;
-  method: string;
-  standard: string;
-  acceptanceCriteria: string;
-  result: QualityResult;
-  inspectorId?: string;
-  certificate?: string;
-  testedAt?: string;
-  notes?: string;
-}
-
-export interface NonConformity {
-  id: string;
-  serviceOrderId: string;
-  description: string;
-  severity: NonConformitySeverity;
-  status: NonConformityStatus;
-  correctiveAction: string;
-  responsibleId: string;
-  createdAt: string;
-  closedAt?: string;
-}
-
-export interface ServiceTemplateItem {
-  areaId: AreaId;
-  name: string;
-  type: PhaseType;
-  qualityType?: QualityRecordType;
-  requiresDocument?: string;
-}
-
-export interface ServiceTemplate {
-  id: string;
-  name: string;
-  mode: ServiceMode;
-  scope: ServiceScope;
-  description: string;
-  items: ServiceTemplateItem[];
-}
-
 export interface PreviewDatabase {
   users: User[];
   clients: Client[];
-  components: Component[];
   assets: Asset[];
   serviceOrders: ServiceOrder[];
-  serviceTemplates: ServiceTemplate[];
-  fieldJobs: FieldJob[];
-  projects: Project[];
-  supplyOrders: SupplyOrder[];
-  qualityRecords: QualityRecord[];
-  nonConformities: NonConformity[];
+  inspections: Inspection[];
   routeSheets: RouteSheet[];
-  parts: Part[];
-  phases: Phase[];
-  spareParts: SparePart[];
+  tasks: Task[];
+  spareRequests: SpareRequest[];
   inventory: InventoryItem[];
   loans: Loan[];
+  projects: Project[];
   audit: AuditEntry[];
 }
 
-export interface NewRouteSheetInput {
-  componentId: string;
-  clientId?: string;
+export interface NewServiceOrderInput {
+  code: string;
+  subCode: string;
+  clientId: string;
+  assetId: string;
+  equipmentCode: string;
   description: string;
+  scope: string;
   priority: Priority;
   dueDate: string;
+  site: string;
+  observations?: string;
 }
 
-export interface NewPartInput {
-  name: string;
-  quantity: number;
-  areas: AreaId[];
+export interface NewTaskInput {
+  stage: number;
+  processId: ProcessId;
+  positionId: PositionId;
+  assignedUserId?: string;
+  description: string;
+  criteria?: string;
+  forms?: string;
 }
 
-export interface NewSparePartInput {
+export interface NewInspectionInput {
+  serviceOrderId: string;
+  findings?: string;
+  tasks: NewTaskInput[];
+}
+
+export interface NewRouteSheetInput {
+  inspectionId: string;
+  description: string;
+  serial: string;
+  equipmentCode: string;
+  site: string;
+  scope: string;
+  priority: Priority;
+  dueDate: string;
+  observations?: string;
+  tasks: NewTaskInput[];
+  aiDraftUsed?: boolean;
+}
+
+export interface NewSpareItemInput {
   name: string;
   code: string;
   quantity: number;
-  areaId: AreaId;
-  partId?: string;
 }
 
-export interface NewUserInput {
-  name: string;
-  username: string;
-  email: string;
-  role: RoleId;
-  areaId?: AreaId;
+export interface NewSpareRequestInput {
+  items: NewSpareItemInput[];
+  notes?: string;
 }
 
 export interface NewInventoryItemInput {
@@ -492,90 +411,70 @@ export interface NewClientInput {
   phone: string;
 }
 
-export interface NewServiceOrderInput {
-  mode: ServiceMode;
+export interface NewUserInput {
+  name: string;
+  username: string;
+  password: string;
+  email: string;
+  role: RoleId;
+  positionId?: PositionId;
+}
+
+export interface NewProjectInput {
+  name: string;
   clientId: string;
-  assetId: string;
-  site: string;
-  scope: ServiceScope;
-  description: string;
-  priority: Priority;
+  ownerId: string;
+  phase: ProjectPhase;
+  startDate: string;
   dueDate: string;
-  templateId?: string;
-  fieldSite?: {
-    siteName: string;
-    location: string;
-    permits: string;
-    riskAnalysis: string;
-    crew: string;
-    containers: number;
-    cranes: string;
-  };
-  projectName?: string;
-  supplyItems?: Array<{ name: string; code: string; quantity: number }>;
-}
-
-export interface NewQualityRecordInput {
-  serviceOrderId: string;
-  routeSheetId?: string;
-  phaseId?: string;
-  type: QualityRecordType;
-  method: string;
-  standard: string;
-  acceptanceCriteria: string;
-  inspectorId?: string;
-  notes?: string;
-}
-
-export interface NewNonConformityInput {
-  serviceOrderId: string;
-  description: string;
-  severity: NonConformitySeverity;
-  correctiveAction: string;
-  responsibleId: string;
 }
 
 export interface ServiceOrderWithRelations extends ServiceOrder {
   client?: Client;
   asset?: Asset;
   creator: User;
+  inspection?: InspectionWithRelations;
   routeSheet?: RouteSheetWithRelations;
-  fieldJob?: FieldJob;
-  project?: Project;
-  supplyOrder?: SupplyOrder;
-  qualityRecords: QualityRecord[];
-  nonConformities: NonConformity[];
+  status: ServiceOrderStatus;
   progress: number;
-  openNonConformities: number;
+}
+
+export interface InspectionWithRelations extends Inspection {
+  serviceOrder: ServiceOrder;
+  client?: Client;
+  asset?: Asset;
+  creator: User;
+  approver?: User;
+  tasks: Task[];
+  progress: number;
+  completedTasks: number;
+  totalTasks: number;
 }
 
 export interface RouteSheetWithRelations extends RouteSheet {
-  component: Component;
+  serviceOrder: ServiceOrder;
+  inspection: InspectionWithRelations;
   client?: Client;
+  asset?: Asset;
   creator: User;
-  parts: Part[];
-  phases: Phase[];
-  spareParts: SparePart[];
+  approver?: User;
+  tasks: Task[];
+  spareRequests: SpareRequest[];
   progress: number;
-  completedPhases: number;
-  totalPhases: number;
+  completedTasks: number;
+  totalTasks: number;
+  currentStage?: number;
+  activeProcess?: Process;
 }
 
-export interface FieldJobWithRelations extends FieldJob {
-  serviceOrder: ServiceOrder;
+export interface TaskWithContext {
+  task: Task;
+  process: Process;
+  position: Position;
+  inspection?: InspectionWithRelations;
+  routeSheet?: RouteSheetWithRelations;
+  serviceOrder?: ServiceOrderWithRelations;
   client?: Client;
   asset?: Asset;
+  assignee?: User;
 }
-
-export interface ProjectWithRelations extends Project {
-  serviceOrder: ServiceOrder;
-  client?: Client;
-  asset?: Asset;
-}
-
-export interface SupplyOrderWithRelations extends SupplyOrder {
-  serviceOrder: ServiceOrder;
-  client?: Client;
-  asset?: Asset;
-}
-

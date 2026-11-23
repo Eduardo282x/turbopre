@@ -1,6 +1,6 @@
 import {
-  BarChart3,
   BadgeCheck,
+  BarChart3,
   Boxes,
   Briefcase,
   Building2,
@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   ClipboardList,
   Factory,
-  FileCheck2,
   FolderKanban,
   Gauge,
   HandCoins,
@@ -17,12 +16,10 @@ import {
   LayoutDashboard,
   ListChecks,
   Map,
-  MapPinned,
   Package,
   Settings,
   ShieldCheck,
   ShoppingCart,
-  Truck,
   Users,
   Wrench,
   type LucideIcon,
@@ -45,22 +42,15 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const ALL_ROLES: RoleId[] = [
+export const ALL_ROLES: RoleId[] = [
   'GLOBAL',
-  'PLANNING',
-  'ENGINEERING',
   'SALES',
   'WORKSHOP',
+  'ENGINEERING',
   'OPERATOR',
-  'WAREHOUSE',
   'QUALITY',
-  'FIELD',
   'PROJECT',
-  'NDT',
-  'METROLOGY',
-  'HSE',
-  'PROCUREMENT',
-  'SECTION_CHIEF',
+  'WAREHOUSE',
 ];
 
 export const NAVIGATION: NavGroup[] = [
@@ -71,68 +61,45 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Centro de control',
         to: '/',
         icon: LayoutDashboard,
-        roles: ALL_ROLES,
+        roles: ['GLOBAL', 'WORKSHOP', 'ENGINEERING', 'OPERATOR', 'QUALITY', 'PROJECT'],
         end: true,
       },
       {
         label: 'Mis tareas',
         to: '/mis-tareas',
         icon: ListChecks,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'QUALITY', 'FIELD', 'SECTION_CHIEF', 'NDT', 'METROLOGY'],
+        roles: ['ENGINEERING', 'OPERATOR', 'QUALITY'],
         badge: 'tasks',
       },
       {
         label: 'Aprobaciones',
         to: '/aprobaciones',
         icon: BadgeCheck,
-        roles: ['GLOBAL', 'ENGINEERING', 'SECTION_CHIEF'],
+        roles: ['GLOBAL', 'PROJECT'],
         badge: 'approvals',
       },
     ],
   },
   {
-    label: 'Expedientes',
+    label: 'Operación',
     items: [
       {
-        label: 'Expedientes de servicio',
-        to: '/expedientes',
+        label: 'Órdenes de servicio',
+        to: '/ordenes-servicio',
         icon: ClipboardList,
-        roles: ALL_ROLES,
+        roles: ['GLOBAL', 'SALES', 'WORKSHOP'],
       },
-    ],
-  },
-  {
-    label: 'Planificación',
-    items: [
       {
         label: 'Hojas de ruta',
         to: '/hojas-de-ruta',
         icon: FolderKanban,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'QUALITY', 'SALES', 'FIELD', 'PROJECT', 'SECTION_CHIEF', 'NDT'],
+        roles: ['GLOBAL', 'SALES', 'WORKSHOP', 'ENGINEERING', 'QUALITY', 'PROJECT'],
       },
       {
         label: 'Historial',
-        to: '/hojas-de-ruta/historial',
+        to: '/historial',
         icon: History,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'QUALITY', 'SALES', 'PROJECT', 'SECTION_CHIEF'],
-      },
-    ],
-  },
-  {
-    label: 'Comercial',
-    items: [
-      {
-        label: 'Panel de ventas',
-        to: '/ventas',
-        icon: ShoppingCart,
-        roles: ['GLOBAL', 'PLANNING', 'SALES'],
-        end: true,
-      },
-      {
-        label: 'Clientes',
-        to: '/ventas/clientes',
-        icon: Building2,
-        roles: ['GLOBAL', 'PLANNING', 'SALES'],
+        roles: ['GLOBAL', 'SALES', 'ENGINEERING', 'QUALITY', 'PROJECT'],
       },
     ],
   },
@@ -143,32 +110,39 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Panel de taller',
         to: '/taller',
         icon: Factory,
-        roles: ['GLOBAL', 'WORKSHOP', 'SECTION_CHIEF', 'ENGINEERING', 'OPERATOR'],
+        roles: ['GLOBAL', 'WORKSHOP'],
         end: true,
       },
       {
         label: 'Inspecciones',
         to: '/taller/inspecciones',
         icon: ClipboardCheck,
-        roles: ['GLOBAL', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'SECTION_CHIEF', 'NDT', 'FIELD'],
+        roles: ['GLOBAL', 'WORKSHOP', 'ENGINEERING'],
       },
       {
         label: 'Repuestos',
         to: '/taller/repuestos',
         icon: Wrench,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'SECTION_CHIEF', 'PROCUREMENT'],
+        roles: ['GLOBAL', 'WORKSHOP', 'ENGINEERING', 'OPERATOR'],
         badge: 'requests',
       },
     ],
   },
   {
-    label: 'Campo',
+    label: 'Comercial',
     items: [
       {
-        label: 'Servicios de campo',
-        to: '/campo',
-        icon: MapPinned,
-        roles: ['GLOBAL', 'FIELD', 'PROJECT', 'HSE', 'WORKSHOP', 'ENGINEERING', 'SECTION_CHIEF'],
+        label: 'Panel de ventas',
+        to: '/ventas',
+        icon: ShoppingCart,
+        roles: ['GLOBAL', 'SALES'],
+        end: true,
+      },
+      {
+        label: 'Clientes',
+        to: '/ventas/clientes',
+        icon: Building2,
+        roles: ['GLOBAL', 'SALES'],
       },
     ],
   },
@@ -179,18 +153,7 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Proyectos',
         to: '/proyectos',
         icon: Briefcase,
-        roles: ['GLOBAL', 'PROJECT', 'ENGINEERING', 'PROCUREMENT', 'HSE'],
-      },
-    ],
-  },
-  {
-    label: 'Suministro',
-    items: [
-      {
-        label: 'Suministro',
-        to: '/suministro',
-        icon: Truck,
-        roles: ['GLOBAL', 'PROCUREMENT', 'SALES', 'WAREHOUSE', 'PROJECT'],
+        roles: ['GLOBAL', 'ENGINEERING'],
       },
     ],
   },
@@ -201,63 +164,26 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Inventario',
         to: '/almacen/inventario',
         icon: Boxes,
-        roles: ['GLOBAL', 'WAREHOUSE', 'METROLOGY'],
+        roles: ['GLOBAL', 'WAREHOUSE'],
       },
       {
         label: 'Solicitudes',
         to: '/almacen/solicitudes',
         icon: Package,
-        roles: ['GLOBAL', 'WAREHOUSE', 'METROLOGY'],
+        roles: ['GLOBAL', 'WAREHOUSE'],
         badge: 'requests',
       },
       {
         label: 'Préstamos',
         to: '/almacen/prestamos',
         icon: HandCoins,
-        roles: ['GLOBAL', 'WAREHOUSE', 'METROLOGY'],
+        roles: ['GLOBAL', 'WAREHOUSE'],
       },
       {
         label: 'Calibración',
         to: '/almacen/calibracion',
         icon: CalendarClock,
-        roles: ['GLOBAL', 'WAREHOUSE', 'METROLOGY', 'QUALITY'],
-      },
-    ],
-  },
-  {
-    label: 'Calidad',
-    items: [
-      {
-        label: 'Mis tareas',
-        to: '/calidad/tareas',
-        icon: ListChecks,
-        roles: ['GLOBAL', 'QUALITY', 'NDT', 'SECTION_CHIEF'],
-        badge: 'tasks',
-      },
-      {
-        label: 'Visto bueno',
-        to: '/calidad/visto-bueno',
-        icon: CheckCircle2,
-        roles: ['GLOBAL', 'QUALITY', 'NDT'],
-        badge: 'quality',
-      },
-      {
-        label: 'Registros NDT / pruebas',
-        to: '/calidad/registros',
-        icon: FileCheck2,
-        roles: ['GLOBAL', 'QUALITY', 'NDT', 'ENGINEERING', 'SECTION_CHIEF'],
-      },
-      {
-        label: 'No conformidades',
-        to: '/calidad/no-conformidades',
-        icon: Gauge,
-        roles: ['GLOBAL', 'QUALITY', 'NDT', 'ENGINEERING', 'HSE', 'SECTION_CHIEF'],
-      },
-      {
-        label: 'Historial',
-        to: '/calidad/historial',
-        icon: History,
-        roles: ['GLOBAL', 'QUALITY', 'NDT'],
+        roles: ['GLOBAL', 'WAREHOUSE'],
       },
     ],
   },
@@ -268,13 +194,13 @@ export const NAVIGATION: NavGroup[] = [
         label: 'Rendimiento',
         to: '/analitica/rendimiento',
         icon: BarChart3,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'SALES', 'PROJECT', 'FIELD', 'SECTION_CHIEF', 'NDT'],
+        roles: ['GLOBAL', 'ENGINEERING', 'PROJECT'],
       },
       {
         label: 'Mapa de planta',
         to: '/planta',
         icon: Map,
-        roles: ['GLOBAL', 'PLANNING', 'ENGINEERING', 'WORKSHOP', 'OPERATOR', 'FIELD', 'SECTION_CHIEF'],
+        roles: ['GLOBAL', 'WORKSHOP', 'PROJECT'],
       },
     ],
   },
@@ -331,5 +257,6 @@ export function findNavItem(pathname: string): NavItem | undefined {
   );
 }
 
-export { ALL_ROLES };
-export const FACTORY_ICON = Factory;
+export const QUALITY_QUEUE_ICON = CheckCircle2;
+export const PERFORMANCE_ICON = Gauge;
+export { Factory as FACTORY_ICON };

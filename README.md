@@ -19,23 +19,27 @@ TurboPre/
 
 - Node.js `>= 20.19` (probado con 24.19)
 - pnpm `11.x` (`npm i -g pnpm`)
-- PostgreSQL (opcional mientras `AUTH_DEMO=true`)
+- PostgreSQL
 
 ## Puesta en marcha
 
 ```bash
 pnpm install            # instala todo el workspace y genera el cliente Prisma
 cp apps/backend/.env.example apps/backend/.env
+# ajusta DATABASE_URL en apps/backend/.env
+pnpm db:migrate         # crea las tablas
+pnpm db:seed            # crea catálogos y el administrador
 pnpm dev                # frontend en :5173 y API en :3000
 ```
 
-Abre <http://localhost:5173> e inicia sesión con el usuario demo:
+Abre <http://localhost:5173> e inicia sesión con el usuario administrador semilla:
 
-| Correo | Contraseña |
+| Usuario | Contraseña |
 | --- | --- |
-| `admin@turbopre.dev` | `Admin123!` |
+| `admin` | `Admin123!` |
 
-> El login demo no toca la base de datos. Se controla con `AUTH_DEMO` en `apps/backend/.env`.
+> El administrador y los catálogos se crean con `pnpm db:seed`. No hay modo demo:
+> el login siempre valida contra PostgreSQL.
 
 ## Scripts (raíz)
 
@@ -45,6 +49,8 @@ Abre <http://localhost:5173> e inicia sesión con el usuario demo:
 | `pnpm build` | Compila `shared` y luego ambas apps. |
 | `pnpm lint` | oxlint en los tres paquetes. |
 | `pnpm check-types` | `tsc` en los tres paquetes. |
+| `pnpm --filter backend test` | Pruebas unitarias del backend (Vitest). |
+| `pnpm --filter backend test:e2e` | Pruebas e2e del backend (levanta la app en un puerto libre). |
 | `pnpm dev:web` / `pnpm dev:api` | Solo una de las apps. |
 | `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` | Comandos de Prisma en el backend. |
 
@@ -52,14 +58,42 @@ Abre <http://localhost:5173> e inicia sesión con el usuario demo:
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| `GET` | `/api/health` | Estado de la API (usado por el dashboard). |
-| `POST` | `/api/auth/login` | Login con `{ email, password }` → `{ accessToken, user }`. |
-| `GET` | `/api/auth/me` | Usuario del token (`Authorization: Bearer …`). |
+| `GET` | `/api/health` | Estado de la API; `data` contiene `{ status, service, version, uptime, timestamp }`. |
+| `POST` | `/api/auth/login` | Login con `{ username, password }`; `data` contiene `{ accessToken, user }`. |
+| `GET` | `/api/auth/me` | Usuario del token (`Authorization: Bearer …`); `data` contiene el usuario. |
 
-## Integración con PostgreSQL (pendiente)
+### Formato de respuesta
 
-El esquema de Prisma y el módulo de acceso a datos ya están listos, pero **la base de datos todavía
-no está conectada**. Para completarla:
+Todas las rutas, incluidas las de error, responden con el mismo sobre:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Operación exitosa",
+  "data": {}
+}
+```
+
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "username: El nombre de usuario debe tener al menos 3 caracteres",
+  "data": {
+    "errors": ["username: El nombre de usuario debe tener al menos 3 caracteres"]
+  }
+}
+```
+
+- El mensaje de éxito se puede personalizar con `@ApiMessage('...')` en el handler.
+- Los errores no exponen stack traces ni mensajes internos de Prisma.
+- En el frontend, los services tipan `ApiSuccess<T>` y devuelven `data.data`.
+
+## Base de datos PostgreSQL
+
+El esquema de dominio y el cliente de Prisma ya están listos. Para crear la base
+en local:
 
 1. Crea el rol y la base (con tu usuario administrador de PostgreSQL):
 
@@ -76,17 +110,17 @@ no está conectada**. Para completarla:
    DATABASE_URL="postgresql://turbopre:turbopre@localhost:5432/turbopre?schema=public"
    ```
 
-3. Genera la migración inicial y el usuario semilla:
+3. Genera la migración inicial, los catálogos y el administrador:
 
    ```bash
    pnpm db:migrate
    pnpm db:seed
    ```
 
-4. Cambia `AUTH_DEMO=false` y reinicia `pnpm dev`.
-
-El modelo `User` vive en `apps/backend/prisma/schema.prisma` y el cliente generado se escribe en
-`apps/backend/src/generated/prisma` (se regenera con `pnpm install` o `pnpm db:generate`).
+El modelo de dominio completo vive en `apps/backend/prisma/schema.prisma` y su
+documentación funcional y diagramas en `docs/domain-model.md`. El cliente generado
+se escribe en `apps/backend/src/generated/prisma` (se regenera con `pnpm install`
+o `pnpm db:generate`).
 
 ## Frontend
 
@@ -113,10 +147,12 @@ apps/frontend/src/
 
 ```
 apps/backend/src/
-├─ main.ts        prefijo /api, CORS, StandardSchemaValidationPipe
-├─ auth/          login, /me, guard JWT y usuario demo
-├─ health/        GET /api/health
-└─ prisma/        PrismaService (inicialización perezosa) y módulo global
+├─ main.ts         prefijo /api, CORS, StandardSchemaValidationPipe
+├─ auth/           login, /me, guard JWT y servicio contra PostgreSQL
+├─ common/         filtro global de excepciones y decoradores
+├─ interceptors/   sobre estándar de respuestas exitosas
+├─ health/         GET /api/health
+└─ prisma/         PrismaService (inicialización perezosa) y módulo global
 ```
 
 La validación usa `StandardSchemaValidationPipe` de Nest 12 con los esquemas zod de
@@ -167,7 +203,7 @@ Opción B: crear un **Web Service** manual con runtime Node.
 | Start Command | `node apps/backend/dist/main.js` |
 | Health Check Path | `/api/health` |
 
-Variables de entorno: `NODE_VERSION=24`, `NODE_ENV=production`, `AUTH_DEMO=false`,
+Variables de entorno: `NODE_VERSION=24`, `NODE_ENV=production`,
 `JWT_SECRET`, `CORS_ORIGIN` y `DATABASE_URL` (Render Postgres). **No definas `PORT`**:
 lo inyecta Render y la API ya lo lee.
 

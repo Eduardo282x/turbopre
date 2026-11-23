@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -27,11 +27,12 @@ interface StatusBadgeProps {
   tone?: StatusTone;
   className?: string;
   dot?: boolean;
+  style?: CSSProperties;
 }
 
-export function StatusBadge({ children, tone = 'neutral', className, dot = false }: StatusBadgeProps) {
+export function StatusBadge({ children, tone = 'neutral', className, dot = false, style }: StatusBadgeProps) {
   return (
-    <Badge variant="outline" className={cn('gap-1.5 font-medium', toneClasses[tone], className)}>
+    <Badge variant="outline" className={cn('gap-1.5 font-medium', toneClasses[tone], className)} style={style}>
       {dot && <span className={cn('size-1.5 rounded-full', dotClasses[tone])} aria-hidden="true" />}
       {children}
     </Badge>

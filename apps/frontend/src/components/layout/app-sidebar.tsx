@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRoleDisplay } from '@/features/preview/config';
-import { getMyTasks, getPendingApprovals, getQualityQueue, getWarehouseRequests } from '@/features/preview/store/selectors';
+import { getMyTasks, getPendingApprovals, getQualityQueue, getWarehousePendingItems } from '@/features/preview/store/selectors';
 import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { getInitials } from '@/lib/formatters';
@@ -32,7 +32,7 @@ export function AppSidebar({ collapsed = false, onToggleCollapse, onNavigate, cl
   const counts: Record<NavBadge, number> = {
     tasks: getMyTasks(db, user).length,
     approvals: getPendingApprovals(db).length,
-    requests: getWarehouseRequests(db).length,
+    requests: getWarehousePendingItems(db).length,
     quality: getQualityQueue(db).length,
   };
 

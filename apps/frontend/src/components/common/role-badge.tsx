@@ -1,20 +1,19 @@
 import { Badge } from '@/components/ui/badge';
-import { ROLE_COLORS, ROLE_BY_ID, getAreaShortName } from '@/features/preview/config';
-import type { RoleId, User } from '@/features/preview/types';
+import { POSITION_BY_ID, ROLE_BY_ID, ROLE_COLORS, getProcessShortName } from '@/features/preview/config';
+import type { PositionId, RoleId } from '@/features/preview/types';
 import { cn } from '@/lib/utils';
 
 interface RoleBadgeProps {
   role: RoleId;
-  areaId?: User['areaId'];
+  positionId?: PositionId;
   className?: string;
 }
 
-export function RoleBadge({ role, areaId, className }: RoleBadgeProps) {
+export function RoleBadge({ role, positionId, className }: RoleBadgeProps) {
   const color = ROLE_COLORS[role];
-  const label =
-    role === 'OPERATOR' && areaId
-      ? `Operador · ${getAreaShortName(areaId)}`
-      : ROLE_BY_ID[role].label;
+  const label = positionId
+    ? `${POSITION_BY_ID[positionId].shortName} · ${getProcessShortName(POSITION_BY_ID[positionId].processId)}`
+    : ROLE_BY_ID[role].label;
 
   return (
     <Badge

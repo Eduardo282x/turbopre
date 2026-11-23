@@ -1,51 +1,75 @@
-import {
-  AREAS,
-  AREA_BY_ID,
-  ROUTE_STATUS_META,
-  ROUTE_STATUS_ORDER,
-} from '../config';
+import { POSITION_BY_ID, PROCESSES, PROCESS_BY_ID, ROUTE_STATUS_ORDER } from '../config';
 import type {
-  Area,
   Asset,
-  AuditEntry,
   Client,
-  Component,
-  FieldJobWithRelations,
-  NonConformity,
-  Part,
-  Phase,
+  InspectionWithRelations,
   PreviewDatabase,
-  ProjectWithRelations,
-  QualityRecord,
+  Process,
   RouteSheet,
   RouteSheetWithRelations,
   ServiceOrder,
+  ServiceOrderStatus,
   ServiceOrderWithRelations,
-  SparePart,
-  SupplyOrderWithRelations,
+  SpareItem,
+  SpareRequest,
+  Task,
+  TaskWithContext,
   User,
 } from '../types';
-
-export interface PhaseWithContext {
-  phase: Phase;
-  part: Part;
-  route: RouteSheet;
-  component: Component;
-  client?: Client;
-  area: Area;
-}
 
 export interface RouteMetrics {
   total: number;
   active: number;
-  delivered: number;
-  critical: number;
-  inReview: number;
+  pendingApproval: number;
+  inAnnexes: number;
   inQuality: number;
   readyForDelivery: number;
-  totalParts: number;
-  totalPhases: number;
-  completedPhases: number;
+  delivered: number;
+  critical: number;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+export interface InspectionMetrics {
+  total: number;
+  open: number;
+  inProgress: number;
+  completed: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface ServiceOrderMetrics {
+  total: number;
+  received: number;
+  inInspection: number;
+  inRoute: number;
+  inExecution: number;
+  inAnnexes: number;
+  inQuality: number;
+  readyForDelivery: number;
+  delivered: number;
+  critical: number;
+}
+
+export interface Progress {
+  completed: number;
+  total: number;
+  progress: number;
+}
+
+export interface StageGroup {
+  stage: number;
+  tasks: Task[];
+  completed: boolean;
+  active: boolean;
+}
+
+export interface WarehouseItem {
+  request: SpareRequest;
+  item: SpareItem;
+  route?: RouteSheet;
+  serviceOrder?: ServiceOrder;
 }
 
 export function getUserById(db: PreviewDatabase, userId?: string): User | undefined {
@@ -56,18 +80,86 @@ export function getClientById(db: PreviewDatabase, clientId?: string): Client | 
   return clientId ? db.clients.find((client) => client.id === clientId) : undefined;
 }
 
-export function getComponentById(db: PreviewDatabase, componentId?: string): Component | undefined {
-  return componentId ? db.components.find((component) => component.id === componentId) : undefined;
+export function getAssetById(db: PreviewDatabase, assetId?: string): Asset | undefined {
+  return assetId ? db.assets.find((asset) => asset.id === assetId) : undefined;
+}
+
+export function getServiceOrderById(db: PreviewDatabase, id?: string): ServiceOrder | undefined {
+  return id ? db.serviceOrders.find((order) => order.id === id) : undefined;
 }
 
 export function getInventoryById(db: PreviewDatabase, itemId: string) {
   return db.inventory.find((item) => item.id === itemId);
 }
 
-export function getRouteProgress(phases: Phase[]): { completed: number; total: number; progress: number } {
-  const total = phases.length;
-  const completed = phases.filter((phase) => phase.status === 'COMPLETED').length;
+export function getTasksForInspection(db: PreviewDatabase, inspectionId: string): Task[] {
+  return db.tasks
+    .filter((task) => task.inspectionId === inspectionId)
+    .sort((a, b) => a.step - b.step);
+}
+
+export function getTasksForRoute(db: PreviewDatabase, routeId: string): Task[] {
+  return db.tasks
+    .filter((task) => task.routeSheetId === routeId)
+    .sort((a, b) => a.step - b.step);
+}
+
+export function getProgress(tasks: Task[]): Progress {
+  const total = tasks.length;
+  const completed = tasks.filter((task) => task.status === 'COMPLETED').length;
   return { completed, total, progress: total === 0 ? 0 : Math.round((completed / total) * 100) };
+}
+
+export function getCurrentStage(tasks: Task[]): number | undefined {
+  if (tasks.length === 0) return undefined;
+  const stages = [...new Set(tasks.map((task) => task.stage))].sort((a, b) => a - b);
+  return stages.find((stage) =>
+    tasks.filter((task) => task.stage === stage).some((task) => task.status !== 'COMPLETED'),
+  );
+}
+
+export function getStageGroups(tasks: Task[]): StageGroup[] {
+  const stages = [...new Set(tasks.map((task) => task.stage))].sort((a, b) => a - b);
+  const current = getCurrentStage(tasks);
+  return stages.map((stage) => {
+    const stageTasks = tasks.filter((task) => task.stage === stage);
+    return {
+      stage,
+      tasks: stageTasks,
+      completed: stageTasks.every((task) => task.status === 'COMPLETED'),
+      active: stage === current,
+    };
+  });
+}
+
+export function getInspectionWithRelations(
+  db: PreviewDatabase,
+  inspectionId: string,
+): InspectionWithRelations | undefined {
+  const inspection = db.inspections.find((item) => item.id === inspectionId);
+  if (!inspection) return undefined;
+  const serviceOrder = getServiceOrderById(db, inspection.serviceOrderId);
+  if (!serviceOrder) return undefined;
+  const tasks = getTasksForInspection(db, inspectionId);
+  const progress = getProgress(tasks);
+  return {
+    ...inspection,
+    serviceOrder,
+    client: getClientById(db, serviceOrder.clientId),
+    asset: getAssetById(db, serviceOrder.assetId),
+    creator: getUserById(db, inspection.createdBy) ?? db.users[0],
+    approver: getUserById(db, inspection.approvedBy),
+    tasks,
+    progress: progress.progress,
+    completedTasks: progress.completed,
+    totalTasks: progress.total,
+  };
+}
+
+export function getInspectionsWithRelations(db: PreviewDatabase): InspectionWithRelations[] {
+  return db.inspections
+    .map((inspection) => getInspectionWithRelations(db, inspection.id))
+    .filter((inspection): inspection is InspectionWithRelations => Boolean(inspection));
 }
 
 export function getRouteSheetWithRelations(
@@ -76,210 +168,325 @@ export function getRouteSheetWithRelations(
 ): RouteSheetWithRelations | undefined {
   const route = db.routeSheets.find((item) => item.id === routeId);
   if (!route) return undefined;
-  const component = getComponentById(db, route.componentId);
-  if (!component) return undefined;
-  const parts = db.parts.filter((part) => part.routeSheetId === routeId);
-  const phases = db.phases.filter((phase) => phase.routeSheetId === routeId);
-  const progress = getRouteProgress(phases);
+  const serviceOrder = getServiceOrderById(db, route.serviceOrderId);
+  const inspection = getInspectionWithRelations(db, route.inspectionId);
+  if (!serviceOrder || !inspection) return undefined;
+  const tasks = getTasksForRoute(db, routeId);
+  const progress = getProgress(tasks);
+  const currentStage = getCurrentStage(tasks);
+  const activeTask = tasks.find((task) => task.status !== 'COMPLETED');
   return {
     ...route,
-    component,
-    client: getClientById(db, route.clientId),
+    serviceOrder,
+    inspection,
+    client: getClientById(db, serviceOrder.clientId),
+    asset: getAssetById(db, serviceOrder.assetId),
     creator: getUserById(db, route.createdBy) ?? db.users[0],
-    parts,
-    phases,
-    spareParts: db.spareParts.filter((spare) => spare.routeSheetId === routeId),
+    approver: getUserById(db, route.approvedBy),
+    tasks,
+    spareRequests: db.spareRequests.filter((request) => request.routeSheetId === routeId),
     progress: progress.progress,
-    completedPhases: progress.completed,
-    totalPhases: progress.total,
+    completedTasks: progress.completed,
+    totalTasks: progress.total,
+    currentStage,
+    activeProcess: activeTask ? PROCESS_BY_ID[activeTask.processId] : undefined,
   };
 }
 
-export function getRoutesWithRelations(db: PreviewDatabase): RouteSheetWithRelations[] {
+export function getRouteSheetsWithRelations(db: PreviewDatabase): RouteSheetWithRelations[] {
   return db.routeSheets
     .map((route) => getRouteSheetWithRelations(db, route.id))
     .filter((route): route is RouteSheetWithRelations => Boolean(route));
 }
 
-export function getPhaseContexts(db: PreviewDatabase): PhaseWithContext[] {
-  const routes = new Map(db.routeSheets.map((route) => [route.id, route]));
-  const parts = new Map(db.parts.map((part) => [part.id, part]));
-  const components = new Map(db.components.map((component) => [component.id, component]));
-  const clients = new Map(db.clients.map((client) => [client.id, client]));
-
-  const contexts: Array<PhaseWithContext | null> = db.phases.map((phase) => {
-    const route = routes.get(phase.routeSheetId);
-    const part = parts.get(phase.partId);
-    if (!route || !part) return null;
-    const component = components.get(route.componentId);
-    const area = AREA_BY_ID[phase.areaId];
-    if (!component || !area) return null;
-    return {
-      phase,
-      part,
-      route,
-      component,
-      client: route.clientId ? clients.get(route.clientId) : undefined,
-      area,
-    };
-  });
-
-  return contexts.filter((context): context is PhaseWithContext => context !== null);
+export function getServiceOrderStatus(db: PreviewDatabase, order: ServiceOrder): ServiceOrderStatus {
+  if (order.cancelledAt) return 'CANCELLED';
+  const route = order.routeSheetId
+    ? db.routeSheets.find((item) => item.id === order.routeSheetId)
+    : undefined;
+  if (route) {
+    if (route.status === 'DELIVERED') return 'DELIVERED';
+    if (route.status === 'READY_FOR_DELIVERY') return 'READY_FOR_DELIVERY';
+    if (route.status === 'IN_QUALITY') return 'IN_QUALITY';
+    if (route.status === 'IN_ANNEXES') return 'IN_ANNEXES';
+    if (route.status === 'IN_PROGRESS' || route.status === 'APPROVED') return 'IN_EXECUTION';
+    return 'IN_ROUTE';
+  }
+  const inspection = order.inspectionId
+    ? db.inspections.find((item) => item.id === order.inspectionId)
+    : undefined;
+  if (inspection?.status === 'APPROVED') return 'INSPECTION_APPROVED';
+  if (inspection) return 'IN_INSPECTION';
+  return 'RECEIVED';
 }
 
-export function getMyTasks(db: PreviewDatabase, user: User): PhaseWithContext[] {
-  const contexts = getPhaseContexts(db).filter((context) => context.phase.status !== 'COMPLETED');
-  if (user.role === 'GLOBAL') return contexts;
-  if (user.role === 'OPERATOR') {
-    return contexts.filter((context) => context.phase.areaId === user.areaId);
-  }
-  if (user.role === 'SECTION_CHIEF') {
-    return contexts.filter(
-      (context) => context.phase.areaId === user.areaId || context.phase.type === 'INSPECTION',
-    );
-  }
-  if (user.role === 'NDT') {
-    return contexts.filter(
-      (context) =>
-        context.phase.type === 'INSPECTION' ||
-        context.phase.areaId === 'quality' ||
-        context.phase.areaId === 'metrology',
-    );
-  }
-  if (user.role === 'METROLOGY') {
-    return contexts.filter((context) => context.phase.areaId === 'metrology');
-  }
-  if (user.role === 'FIELD') {
-    return contexts.filter(
-      (context) => context.phase.areaId.startsWith('field_') || context.phase.type === 'INSPECTION',
-    );
-  }
-  if (user.role === 'PROJECT') {
-    return contexts.filter((context) => context.phase.areaId === 'projects');
-  }
-  if (user.role === 'QUALITY') {
-    return contexts.filter((context) => context.phase.areaId === 'quality' || context.phase.type === 'QUALITY');
-  }
-  if (user.role === 'ENGINEERING') {
-    return contexts.filter(
-      (context) =>
-        context.phase.areaId === 'engineering' ||
-        context.phase.type === 'INSPECTION' ||
-        context.route.status === 'IN_REVIEW',
-    );
-  }
-  if (user.role === 'WORKSHOP') {
-    return contexts.filter(
-      (context) =>
-        context.phase.areaId === 'workshop' ||
-        context.phase.type === 'INSPECTION' ||
-        context.route.status === 'IN_REVIEW',
-    );
-  }
-  if (user.role === 'PLANNING') {
-    return contexts.filter((context) => context.route.status === 'DRAFT');
-  }
-  if (user.role === 'SALES') {
-    return contexts.filter(
-      (context) =>
-        context.route.status === 'READY_FOR_DELIVERY' || context.route.status === 'DELIVERED',
-    );
-  }
-  if (user.role === 'HSE' || user.role === 'PROCUREMENT') return [];
-  return contexts;
+export function getServiceOrderWithRelations(
+  db: PreviewDatabase,
+  orderId: string,
+): ServiceOrderWithRelations | undefined {
+  const order = getServiceOrderById(db, orderId);
+  if (!order) return undefined;
+  const routeSheet = order.routeSheetId
+    ? getRouteSheetWithRelations(db, order.routeSheetId)
+    : undefined;
+  const inspection = order.inspectionId
+    ? getInspectionWithRelations(db, order.inspectionId)
+    : undefined;
+  const progress = routeSheet?.progress ?? inspection?.progress ?? 0;
+  return {
+    ...order,
+    client: getClientById(db, order.clientId),
+    asset: getAssetById(db, order.assetId),
+    creator: getUserById(db, order.createdBy) ?? db.users[0],
+    inspection,
+    routeSheet,
+    status: getServiceOrderStatus(db, order),
+    progress,
+  };
+}
+
+export function getServiceOrdersWithRelations(db: PreviewDatabase): ServiceOrderWithRelations[] {
+  return db.serviceOrders
+    .map((order) => getServiceOrderWithRelations(db, order.id))
+    .filter((order): order is ServiceOrderWithRelations => Boolean(order));
+}
+
+function taskContext(
+  db: PreviewDatabase,
+  task: Task,
+): TaskWithContext | undefined {
+  const process = PROCESS_BY_ID[task.processId];
+  const position = POSITION_BY_ID[task.positionId];
+  if (!process || !position) return undefined;
+  const inspection = task.inspectionId
+    ? getInspectionWithRelations(db, task.inspectionId)
+    : undefined;
+  const routeSheet = task.routeSheetId
+    ? getRouteSheetWithRelations(db, task.routeSheetId)
+    : undefined;
+  const ownerOrder = routeSheet?.serviceOrder ?? inspection?.serviceOrder;
+  const serviceOrder = ownerOrder ? getServiceOrderWithRelations(db, ownerOrder.id) : undefined;
+  return {
+    task,
+    process,
+    position,
+    inspection,
+    routeSheet,
+    serviceOrder,
+    client: routeSheet?.client ?? inspection?.client,
+    asset: routeSheet?.asset ?? inspection?.asset,
+    assignee: getUserById(db, task.assignedUserId),
+  };
+}
+
+export function getTaskContexts(db: PreviewDatabase): TaskWithContext[] {
+  return db.tasks
+    .map((task) => taskContext(db, task))
+    .filter((context): context is TaskWithContext => Boolean(context));
+}
+
+export function isTaskMine(task: Task, user: User): boolean {
+  if (task.assignedUserId) return task.assignedUserId === user.id;
+  return Boolean(user.positionId) && user.positionId === task.positionId;
+}
+
+export function getMyTasks(db: PreviewDatabase, user: User): TaskWithContext[] {
+  if (user.role === 'GLOBAL') return [];
+  if (!['OPERATOR', 'ENGINEERING', 'QUALITY'].includes(user.role)) return [];
+  return getTaskContexts(db)
+    .filter((context) => context.task.status !== 'COMPLETED' && isTaskMine(context.task, user))
+    .sort((a, b) => {
+      if (a.task.stage !== b.task.stage) return a.task.stage - b.task.stage;
+      return a.task.step - b.task.step;
+    });
 }
 
 export function getPendingApprovals(db: PreviewDatabase): RouteSheetWithRelations[] {
-  return getRoutesWithRelations(db)
-    .filter((route) => route.status === 'IN_REVIEW')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return getRouteSheetsWithRelations(db)
+    .filter((route) => route.status === 'PENDING_APPROVAL')
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
 }
 
 export function getQualityQueue(db: PreviewDatabase): RouteSheetWithRelations[] {
-  return getRoutesWithRelations(db)
+  return getRouteSheetsWithRelations(db)
     .filter((route) => route.status === 'IN_QUALITY')
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 }
 
-export function getWarehouseRequests(db: PreviewDatabase): SparePart[] {
-  return db.spareParts
-    .filter((spare) => spare.status !== 'DISPATCHED')
-    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+export function getAnnexQueue(db: PreviewDatabase): RouteSheetWithRelations[] {
+  return getRouteSheetsWithRelations(db)
+    .filter((route) => route.status === 'IN_ANNEXES')
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
 }
 
-export function getRecentAudit(db: PreviewDatabase, limit = 12): AuditEntry[] {
-  return [...db.audit]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, limit);
+export function getApprovedInspectionsWithoutRoute(db: PreviewDatabase): InspectionWithRelations[] {
+  const routed = new Set(db.routeSheets.map((route) => route.inspectionId));
+  return getInspectionsWithRelations(db)
+    .filter((inspection) => inspection.status === 'APPROVED' && !routed.has(inspection.id))
+    .sort((a, b) => new Date(b.approvedAt ?? b.updatedAt).getTime() - new Date(a.approvedAt ?? a.updatedAt).getTime());
+}
+
+export function getInspectionsForWorkshop(db: PreviewDatabase): InspectionWithRelations[] {
+  return getInspectionsWithRelations(db).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+export function getWarehousePendingItems(db: PreviewDatabase): WarehouseItem[] {
+  return db.spareRequests.flatMap((request) => {
+    const route = db.routeSheets.find((item) => item.id === request.routeSheetId);
+    const serviceOrder = route ? getServiceOrderById(db, route.serviceOrderId) : undefined;
+    return request.items
+      .filter((item) => item.destination === 'WAREHOUSE' && item.status !== 'DISPATCHED')
+      .map((item) => ({ request, item, route, serviceOrder }));
+  });
+}
+
+export function getProcurePendingItems(db: PreviewDatabase): WarehouseItem[] {
+  return db.spareRequests.flatMap((request) => {
+    const route = db.routeSheets.find((item) => item.id === request.routeSheetId);
+    const serviceOrder = route ? getServiceOrderById(db, route.serviceOrderId) : undefined;
+    return request.items
+      .filter((item) => item.destination === 'PROCURE' && item.status !== 'RECEIVED')
+      .map((item) => ({ request, item, route, serviceOrder }));
+  });
 }
 
 export function getRouteMetrics(db: PreviewDatabase): RouteMetrics {
-  const total = db.routeSheets.length;
-  const active = db.routeSheets.filter((route) =>
-    ['APPROVED', 'IN_PROGRESS', 'IN_QUALITY'].includes(route.status),
-  ).length;
-  const delivered = db.routeSheets.filter((route) => route.status === 'DELIVERED').length;
-  const critical = db.routeSheets.filter(
-    (route) => route.priority === 'CRITICAL' && route.status !== 'DELIVERED',
-  ).length;
-  const inReview = db.routeSheets.filter((route) => route.status === 'IN_REVIEW').length;
-  const inQuality = db.routeSheets.filter((route) => route.status === 'IN_QUALITY').length;
-  const readyForDelivery = db.routeSheets.filter((route) => route.status === 'READY_FOR_DELIVERY').length;
-
+  const routes = db.routeSheets;
+  const tasks = db.tasks.filter((task) => task.routeSheetId);
   return {
-    total,
-    active,
-    delivered,
-    critical,
-    inReview,
-    inQuality,
-    readyForDelivery,
-    totalParts: db.parts.length,
-    totalPhases: db.phases.length,
-    completedPhases: db.phases.filter((phase) => phase.status === 'COMPLETED').length,
+    total: routes.length,
+    active: routes.filter((route) => ['APPROVED', 'IN_PROGRESS', 'IN_ANNEXES', 'IN_QUALITY'].includes(route.status)).length,
+    pendingApproval: routes.filter((route) => route.status === 'PENDING_APPROVAL').length,
+    inAnnexes: routes.filter((route) => route.status === 'IN_ANNEXES').length,
+    inQuality: routes.filter((route) => route.status === 'IN_QUALITY').length,
+    readyForDelivery: routes.filter((route) => route.status === 'READY_FOR_DELIVERY').length,
+    delivered: routes.filter((route) => route.status === 'DELIVERED').length,
+    critical: routes.filter((route) => route.priority === 'CRITICAL' && route.status !== 'DELIVERED').length,
+    totalTasks: tasks.length,
+    completedTasks: tasks.filter((task) => task.status === 'COMPLETED').length,
   };
 }
 
-export function getStatusChartData(db: PreviewDatabase) {
+export function getInspectionMetrics(db: PreviewDatabase): InspectionMetrics {
+  const inspections = db.inspections;
+  return {
+    total: inspections.length,
+    open: inspections.filter((inspection) => inspection.status === 'OPEN').length,
+    inProgress: inspections.filter((inspection) => inspection.status === 'IN_PROGRESS').length,
+    completed: inspections.filter((inspection) => inspection.status === 'COMPLETED').length,
+    approved: inspections.filter((inspection) => inspection.status === 'APPROVED').length,
+    rejected: inspections.filter((inspection) => inspection.status === 'REJECTED').length,
+  };
+}
+
+export function getServiceOrderMetrics(db: PreviewDatabase): ServiceOrderMetrics {
+  const orders = getServiceOrdersWithRelations(db);
+  return {
+    total: orders.length,
+    received: orders.filter((order) => order.status === 'RECEIVED').length,
+    inInspection: orders.filter((order) => order.status === 'IN_INSPECTION').length,
+    inRoute: orders.filter((order) => ['INSPECTION_APPROVED', 'IN_ROUTE'].includes(order.status)).length,
+    inExecution: orders.filter((order) => order.status === 'IN_EXECUTION').length,
+    inAnnexes: orders.filter((order) => order.status === 'IN_ANNEXES').length,
+    inQuality: orders.filter((order) => order.status === 'IN_QUALITY').length,
+    readyForDelivery: orders.filter((order) => order.status === 'READY_FOR_DELIVERY').length,
+    delivered: orders.filter((order) => order.status === 'DELIVERED').length,
+    critical: orders.filter((order) => order.priority === 'CRITICAL' && !['DELIVERED', 'CANCELLED'].includes(order.status)).length,
+  };
+}
+
+export function getProcessWorkloadData(db: PreviewDatabase): Array<{
+  processId: string;
+  name: string;
+  value: number;
+  color: string;
+}> {
+  return PROCESSES.map((process: Process) => ({
+    processId: process.id,
+    name: process.shortName,
+    value: db.tasks.filter(
+      (task) => task.processId === process.id && task.status !== 'COMPLETED',
+    ).length,
+    color: process.color,
+  }));
+}
+
+export function getProcessPerformanceData(db: PreviewDatabase): Array<{
+  processId: string;
+  name: string;
+  hours: number;
+  completed: number;
+  color: string;
+}> {
+  return PROCESSES.map((process) => {
+    const completed = db.tasks.filter(
+      (task) => task.processId === process.id && task.status === 'COMPLETED',
+    );
+    const durations = completed
+      .filter((task) => task.startedAt && task.completedAt)
+      .map((task) => {
+        const start = new Date(task.startedAt as string).getTime();
+        const end = new Date(task.completedAt as string).getTime();
+        return Math.max(0.1, (end - start) / 3600000);
+      });
+    const hours = durations.length
+      ? Math.round((durations.reduce((sum, value) => sum + value, 0) / durations.length) * 10) / 10
+      : 0;
+    return {
+      processId: process.id,
+      name: process.shortName,
+      hours,
+      completed: completed.length,
+      color: process.color,
+    };
+  });
+}
+
+export function getRouteStatusChartData(db: PreviewDatabase) {
+  const labels: Record<string, string> = {
+    DRAFT: 'Borrador',
+    PENDING_APPROVAL: 'Por aprobar',
+    APPROVED: 'Aprobada',
+    IN_PROGRESS: 'Ejecución',
+    IN_ANNEXES: 'Anexos',
+    IN_QUALITY: 'Calidad',
+    READY_FOR_DELIVERY: 'Por entregar',
+    DELIVERED: 'Entregada',
+  };
   return ROUTE_STATUS_ORDER.map((status) => ({
     status,
-    name: ROUTE_STATUS_META[status].shortLabel,
+    name: labels[status],
     value: db.routeSheets.filter((route) => route.status === status).length,
   }));
 }
 
-export function getAreaWorkloadData(db: PreviewDatabase) {
-  return AREAS.filter((area) => ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group)).map((area) => ({
-    areaId: area.id,
-    name: area.shortName,
-    value: db.phases.filter(
-      (phase) => phase.areaId === area.id && phase.status !== 'COMPLETED',
-    ).length,
-    color: area.color,
+export function getSalesStatusData(db: PreviewDatabase) {
+  const statuses: Array<{ name: string; color: string; matches: string[] }> = [
+    { name: 'Recibidas', color: '#64748b', matches: ['RECEIVED'] },
+    { name: 'En inspección', color: '#38bdf8', matches: ['IN_INSPECTION'] },
+    { name: 'En hoja de ruta', color: '#a78bfa', matches: ['INSPECTION_APPROVED', 'IN_ROUTE'] },
+    { name: 'En ejecución', color: '#00d1ff', matches: ['IN_EXECUTION'] },
+    { name: 'En calidad', color: '#ffb020', matches: ['IN_ANNEXES', 'IN_QUALITY'] },
+    { name: 'Por entregar', color: '#22c55e', matches: ['READY_FOR_DELIVERY'] },
+    { name: 'Entregadas', color: '#3b82f6', matches: ['DELIVERED'] },
+  ];
+  const orders = getServiceOrdersWithRelations(db);
+  return statuses.map((status) => ({
+    name: status.name,
+    value: orders.filter((order) => status.matches.includes(order.status)).length,
+    color: status.color,
   }));
 }
 
-export function getAreaPerformanceData(db: PreviewDatabase) {
-  return AREAS.filter((area) => ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group)).map((area) => {
-    const durations = db.phases
-      .filter(
-        (phase) =>
-          phase.areaId === area.id &&
-          phase.status === 'COMPLETED' &&
-          phase.startedAt &&
-          phase.completedAt,
-      )
-      .map((phase) => {
-        const start = new Date(phase.startedAt as string).getTime();
-        const end = new Date(phase.completedAt as string).getTime();
-        return Math.max(0.1, (end - start) / 3600000);
-      });
-    const hours =
-      durations.length === 0
-        ? 0
-        : Math.round((durations.reduce((sum, value) => sum + value, 0) / durations.length) * 10) / 10;
-    return { areaId: area.id, name: area.shortName, hours, color: area.color };
-  });
+export function getUpcomingDeliveries(db: PreviewDatabase) {
+  return getRouteSheetsWithRelations(db)
+    .filter((route) =>
+      ['APPROVED', 'IN_PROGRESS', 'IN_ANNEXES', 'IN_QUALITY', 'READY_FOR_DELIVERY'].includes(route.status),
+    )
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 8);
 }
 
 export function getClientVolumeData(db: PreviewDatabase) {
@@ -287,188 +494,40 @@ export function getClientVolumeData(db: PreviewDatabase) {
     .map((client) => ({
       clientId: client.id,
       name: client.name,
-      value: db.routeSheets.filter((route) => route.clientId === client.id).length,
+      value: db.serviceOrders.filter((order) => order.clientId === client.id).length,
     }))
     .filter((entry) => entry.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 }
 
-export function getSalesStatusData(db: PreviewDatabase) {
-  const notStarted = db.routeSheets.filter((route) =>
-    ['DRAFT', 'IN_REVIEW', 'APPROVED'].includes(route.status),
-  ).length;
-  const inWorkshop = db.routeSheets.filter((route) => route.status === 'IN_PROGRESS').length;
-  const inQuality = db.routeSheets.filter((route) => route.status === 'IN_QUALITY').length;
-  const ready = db.routeSheets.filter((route) => route.status === 'READY_FOR_DELIVERY').length;
-  const delivered = db.routeSheets.filter((route) => route.status === 'DELIVERED').length;
-  return [
-    { name: 'Por iniciar', value: notStarted, color: '#64748b' },
-    { name: 'En taller', value: inWorkshop, color: '#00d1ff' },
-    { name: 'En calidad', value: inQuality, color: '#ffb020' },
-    { name: 'Por entregar', value: ready, color: '#22c55e' },
-    { name: 'Entregadas', value: delivered, color: '#3b82f6' },
-  ];
-}
-
-export function getUpcomingDeliveries(db: PreviewDatabase) {
-  return getRoutesWithRelations(db)
-    .filter((route) =>
-      ['APPROVED', 'IN_PROGRESS', 'IN_QUALITY', 'READY_FOR_DELIVERY'].includes(route.status),
-    )
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 5);
-}
-
-export function getAssetById(db: PreviewDatabase, assetId?: string): Asset | undefined {
-  return assetId ? db.assets.find((asset) => asset.id === assetId) : undefined;
-}
-
-export function getServiceOrderProgress(order: ServiceOrder, db: PreviewDatabase): number {
-  if (order.routeSheetId) {
-    const route = (db.routeSheets ?? []).find((item) => item.id === order.routeSheetId);
-    if (route) {
-      const phases = (db.phases ?? []).filter((phase) => phase.routeSheetId === route.id);
-      return getRouteProgress(phases).progress;
-    }
-  }
-  const project = (db.projects ?? []).find((item) => item.serviceOrderId === order.id);
-  if (project) return project.progress;
-  const fieldJob = (db.fieldJobs ?? []).find((item) => item.serviceOrderId === order.id);
-  if (fieldJob) {
-    const fieldProgress: Record<string, number> = {
-      PLANNED: 10,
-      MOBILIZED: 30,
-      IN_EXECUTION: 60,
-      DEMOBILIZED: 85,
-      CLOSED: 100,
-    };
-    return fieldProgress[fieldJob.status] ?? 0;
-  }
-  const supply = (db.supplyOrders ?? []).find((item) => item.serviceOrderId === order.id);
-  if (supply) {
-    const supplyProgress: Record<string, number> = {
-      REQUESTED: 10,
-      QUOTED: 25,
-      PURCHASED: 45,
-      INSPECTION: 70,
-      DISPATCHED: 85,
-      DELIVERED: 100,
-    };
-    return supplyProgress[supply.status] ?? 0;
-  }
-  return 0;
-}
-
-export function getServiceOrderWithRelations(
-  db: PreviewDatabase,
-  orderId: string,
-): ServiceOrderWithRelations | undefined {
-  const order = (db.serviceOrders ?? []).find((item) => item.id === orderId);
-  if (!order) return undefined;
-  const qualityRecords = (db.qualityRecords ?? []).filter((record) => record.serviceOrderId === order.id);
-  const nonConformities = (db.nonConformities ?? []).filter((record) => record.serviceOrderId === order.id);
-  return {
-    ...order,
-    client: getClientById(db, order.clientId),
-    asset: getAssetById(db, order.assetId),
-    creator: getUserById(db, order.createdBy) ?? db.users[0],
-    routeSheet: order.routeSheetId ? getRouteSheetWithRelations(db, order.routeSheetId) : undefined,
-    fieldJob: (db.fieldJobs ?? []).find((item) => item.serviceOrderId === order.id),
-    project: (db.projects ?? []).find((item) => item.serviceOrderId === order.id),
-    supplyOrder: (db.supplyOrders ?? []).find((item) => item.serviceOrderId === order.id),
-    qualityRecords,
-    nonConformities,
-    progress: getServiceOrderProgress(order, db),
-    openNonConformities: nonConformities.filter((record) => record.status !== 'CLOSED').length,
-  };
-}
-
-export function getServiceOrdersWithRelations(db: PreviewDatabase): ServiceOrderWithRelations[] {
-  return (db.serviceOrders ?? [])
-    .map((order) => getServiceOrderWithRelations(db, order.id))
-    .filter((order): order is ServiceOrderWithRelations => Boolean(order));
-}
-
-export function getServiceOrderMetrics(db: PreviewDatabase) {
-  const orders = db.serviceOrders ?? [];
-  const nonConformities = db.nonConformities ?? [];
-  const qualityRecords = db.qualityRecords ?? [];
-  return {
-    total: orders.length,
-    shop: orders.filter((order) => order.mode === 'SHOP').length,
-    field: orders.filter((order) => order.mode === 'FIELD').length,
-    project: orders.filter((order) => order.mode === 'PROJECT').length,
-    supply: orders.filter((order) => order.mode === 'SUPPLY').length,
-    active: orders.filter((order) => ['APPROVED', 'IN_EXECUTION', 'IN_QUALITY'].includes(order.status)).length,
-    inQuality: orders.filter((order) => order.status === 'IN_QUALITY').length,
-    readyForDelivery: orders.filter((order) => order.status === 'READY_FOR_DELIVERY').length,
-    delivered: orders.filter((order) => ['DELIVERED', 'CLOSED'].includes(order.status)).length,
-    critical: orders.filter((order) => order.priority === 'CRITICAL' && !['DELIVERED', 'CLOSED', 'CANCELLED'].includes(order.status)).length,
-    openNonConformities: nonConformities.filter((record) => record.status !== 'CLOSED').length,
-    pendingQualityRecords: qualityRecords.filter((record) => record.result === 'PENDING').length,
-    failedQualityRecords: qualityRecords.filter((record) => record.result === 'FAIL').length,
-  };
-}
-
-export function getFieldJobsWithRelations(db: PreviewDatabase): FieldJobWithRelations[] {
-  const relations: Array<FieldJobWithRelations | null> = (db.fieldJobs ?? []).map((job) => {
-    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === job.serviceOrderId);
-    if (!serviceOrder) return null;
-    return {
-      ...job,
-      serviceOrder,
-      client: getClientById(db, serviceOrder.clientId),
-      asset: getAssetById(db, serviceOrder.assetId),
-    };
-  });
-  return relations.filter((job): job is FieldJobWithRelations => job !== null);
-}
-
-export function getProjectsWithRelations(db: PreviewDatabase): ProjectWithRelations[] {
-  const relations: Array<ProjectWithRelations | null> = (db.projects ?? []).map((project) => {
-    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === project.serviceOrderId);
-    if (!serviceOrder) return null;
-    return {
-      ...project,
-      serviceOrder,
-      client: getClientById(db, serviceOrder.clientId),
-      asset: getAssetById(db, serviceOrder.assetId),
-    };
-  });
-  return relations.filter((project): project is ProjectWithRelations => project !== null);
-}
-
-export function getSupplyOrdersWithRelations(db: PreviewDatabase): SupplyOrderWithRelations[] {
-  const relations: Array<SupplyOrderWithRelations | null> = (db.supplyOrders ?? []).map((supply) => {
-    const serviceOrder = (db.serviceOrders ?? []).find((order) => order.id === supply.serviceOrderId);
-    if (!serviceOrder) return null;
-    return {
-      ...supply,
-      serviceOrder,
-      client: getClientById(db, serviceOrder.clientId),
-      asset: getAssetById(db, serviceOrder.assetId),
-    };
-  });
-  return relations.filter((supply): supply is SupplyOrderWithRelations => supply !== null);
-}
-
 export function getCalibrationItems(db: PreviewDatabase) {
-  return (db.inventory ?? [])
+  return db.inventory
     .filter((item) => item.calibrationDue)
     .map((item) => {
       const due = new Date(item.calibrationDue as string).getTime();
       const days = Math.ceil((due - Date.now()) / 86400000);
-      const status: 'VALID' | 'DUE_SOON' | 'EXPIRED' = days < 0 ? 'EXPIRED' : days <= 30 ? 'DUE_SOON' : 'VALID';
+      const status: 'VALID' | 'DUE_SOON' | 'EXPIRED' =
+        days < 0 ? 'EXPIRED' : days <= 30 ? 'DUE_SOON' : 'VALID';
       return { item, days, status };
     })
     .sort((a, b) => a.days - b.days);
 }
 
-export function getOpenNonConformities(db: PreviewDatabase): NonConformity[] {
-  return (db.nonConformities ?? []).filter((record) => record.status !== 'CLOSED');
+export function getRecentAudit(db: PreviewDatabase, limit = 12) {
+  return [...db.audit]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }
 
-export function getQualityRecordsByType(db: PreviewDatabase, type: QualityRecord['type']): QualityRecord[] {
-  return (db.qualityRecords ?? []).filter((record) => record.type === type);
+export function getProjectsWithRelations(db: PreviewDatabase) {
+  return db.projects.map((project) => ({
+    ...project,
+    client: getClientById(db, project.clientId),
+    owner: getUserById(db, project.ownerId),
+  }));
+}
+
+export function getProjectById(db: PreviewDatabase, id: string) {
+  return getProjectsWithRelations(db).find((project) => project.id === id);
 }

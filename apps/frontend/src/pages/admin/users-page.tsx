@@ -20,10 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AREAS, ROLE_OPTIONS, getAreaName, getRoleLabel } from '@/features/preview/config';
+import {
+  POSITION_BY_ID,
+  ROLE_OPTIONS,
+  getPositionName,
+  getPositionsForRole,
+  getRoleLabel,
+} from '@/features/preview/config';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { AreaId, RoleId, User } from '@/features/preview/types';
+import type { NewUserInput, PositionId, RoleId, User } from '@/features/preview/types';
 import { formatDate, getInitials } from '@/lib/formatters';
 import { canManageUsers } from '@/lib/permissions';
 
@@ -37,11 +43,13 @@ export function UsersPage() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('demo1234');
   const [role, setRole] = useState<RoleId>('OPERATOR');
-  const [areaId, setAreaId] = useState<AreaId>('turbines');
+  const [positionId, setPositionId] = useState<PositionId>('rotating_specialist');
 
   if (!currentUser) return null;
 
+  const positionOptions = getPositionsForRole(role);
   const operators = db.users.filter((user) => user.role === 'OPERATOR').length;
   const active = db.users.filter((user) => user.active).length;
 
@@ -68,14 +76,18 @@ export function UsersPage() {
     {
       id: 'role',
       header: 'Rol',
-      cell: (user) => <RoleBadge role={user.role} areaId={user.areaId} />,
+      cell: (user) => <RoleBadge role={user.role} positionId={user.positionId} />,
       sortable: true,
       sortValue: (user) => getRoleLabel(user.role),
     },
     {
-      id: 'area',
-      header: 'Área',
-      cell: (user) => <span className="text-xs">{user.areaId ? getAreaName(user.areaId) : 'Global'}</span>,
+      id: 'position',
+      header: 'Puesto',
+      cell: (user) => (
+        <span className="text-xs">
+          {user.positionId ? getPositionName(user.positionId) : '—'}
+        </span>
+      ),
       hideOnMobile: true,
     },
     {
@@ -108,10 +120,20 @@ export function UsersPage() {
       <PageHeader
         eyebrow="Administración"
         title="Usuarios"
-        description="Usuarios, roles y áreas operativas del sistema."
+        description="El administrador crea las cuentas y entrega usuario y contraseña. No hay auto-registro."
         actions={
           canManageUsers(currentUser) ? (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button
+              onClick={() => {
+                setName('');
+                setUsername('');
+                setEmail('');
+                setPassword('demo1234');
+                setRole('OPERATOR');
+                setPositionId('rotating_specialist');
+                setCreateOpen(true);
+              }}
+            >
               <UserPlus /> Crear usuario
             </Button>
           ) : undefined
@@ -121,7 +143,7 @@ export function UsersPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <KpiCard label="Usuarios" value={db.users.length} hint="Cuentas registradas" icon={Users} tone="accent" />
         <KpiCard label="Activos" value={active} hint="Con acceso al sistema" icon={UserPlus} tone="success" />
-        <KpiCard label="Operadores" value={operators} hint="Con área operativa" icon={Users} tone="info" />
+        <KpiCard label="Operadores" value={operators} hint="Con puesto de taller" icon={Users} tone="info" />
       </div>
 
       <DataTable
@@ -151,7 +173,7 @@ export function UsersPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Crear usuario"
-        description="Asigna un rol y, si aplica, un área operativa."
+        description="Asigna rol y puesto. Entrega al usuario el nombre de usuario y la contraseña."
         footer={
           <>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
@@ -159,25 +181,23 @@ export function UsersPage() {
             </Button>
             <Button
               onClick={() => {
-                if (!name.trim() || !username.trim()) {
-                  toast.error('El nombre y el usuario son obligatorios');
+                if (!name.trim() || !username.trim() || !password.trim()) {
+                  toast.error('El nombre, el usuario y la contraseña son obligatorios');
                   return;
                 }
-                createUser(
-                  {
-                    name: name.trim(),
-                    username: username.trim(),
-                    email: email.trim() || `${username.trim()}@turbopre.com`,
-                    role,
-                    areaId: role === 'GLOBAL' ? undefined : areaId,
-                  },
-                  currentUser.id,
-                );
-                toast.success('Usuario creado');
+                const input: NewUserInput = {
+                  name: name.trim(),
+                  username: username.trim(),
+                  password: password.trim(),
+                  email: email.trim() || `${username.trim()}@turbopre.com`,
+                  role,
+                  positionId: positionOptions.length > 0 ? positionId : undefined,
+                };
+                createUser(input, currentUser.id);
+                toast.success('Usuario creado', {
+                  description: `Usuario: ${input.username} · Contraseña: ${input.password}`,
+                });
                 setCreateOpen(false);
-                setName('');
-                setUsername('');
-                setEmail('');
               }}
             >
               <Plus /> Guardar usuario
@@ -199,8 +219,20 @@ export function UsersPage() {
             <Input id="user-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </Field>
           <Field>
+            <FieldLabel htmlFor="user-password">Contraseña inicial</FieldLabel>
+            <Input id="user-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </Field>
+          <Field>
             <FieldLabel>Rol</FieldLabel>
-            <Select value={role} onValueChange={(value) => setRole(value as RoleId)}>
+            <Select
+              value={role}
+              onValueChange={(value) => {
+                const nextRole = value as RoleId;
+                setRole(nextRole);
+                const options = getPositionsForRole(nextRole);
+                setPositionId(options[0]?.id ?? ('rotating_specialist' as PositionId));
+              }}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -213,21 +245,23 @@ export function UsersPage() {
               </SelectContent>
             </Select>
           </Field>
-          <Field className="sm:col-span-2">
-            <FieldLabel>Área operativa</FieldLabel>
-            <Select value={areaId} onValueChange={(value) => setAreaId(value as AreaId)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AREAS.map((area) => (
-                  <SelectItem key={area.id} value={area.id}>
-                    {area.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {positionOptions.length > 0 && (
+            <Field>
+              <FieldLabel>Puesto de trabajo</FieldLabel>
+              <Select value={positionId} onValueChange={(value) => setPositionId(value as PositionId)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {positionOptions.map((position) => (
+                    <SelectItem key={position.id} value={position.id}>
+                      {position.name} · {POSITION_BY_ID[position.id].shortName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
         </div>
       </FormDialog>
 

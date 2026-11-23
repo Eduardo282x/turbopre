@@ -78,18 +78,19 @@ Deseable a futuro (nada de esto está implementado todavía):
 ## 5. Estado actual del repositorio
 
 - Monorepo Turborepo + pnpm con `apps/frontend`, `apps/backend` y `packages/shared`.
-- Auth de ejemplo (JWT + usuario demo en memoria) y `GET /api/health`.
-- Prisma 7 configurado con el modelo `User` de marcador de posición.
+- Auth JWT contra PostgreSQL; el administrador y los catálogos se crean con
+  `pnpm db:seed`. No hay modo demo. `GET /api/health`.
+- Prisma 7 con el modelo de dominio completo en `apps/backend/prisma/schema.prisma`;
+  la documentación funcional y los diagramas están en `docs/domain-model.md`.
 - Deploy de QA preparado: `apps/frontend/vercel.json` y `render.yaml`.
-- **Pendiente de integrar por el equipo**:
-  - un **mockup del frontend**,
-  - un **modelo entidad-relación** de la base de datos.
-
-Cuando lleguen esos artefactos, colócalos en `docs/mockup/` y `docs/modelo-er/`
-(y avísalo), léelos completos y **reconcilia** lo que proponen con lo que ya
-existe; no reemplaces el scaffold a ciegas.
+- **Pendiente**: conectar el frontend (hoy en modo preview con `localStorage`) a
+  los endpoints reales y construir las pantallas de negocio.
 
 ## 6. Antes de implementar dominio: pregunta
+
+> El esquema inicial ya se implementó a partir de `doc.md`; ver
+> `docs/domain-model.md`. Estas preguntas siguen vigentes para nuevos requisitos
+> o cambios de alcance.
 
 Este proyecto se está definiendo mientras se construye. Antes de crear tablas,
 migraciones, endpoints o pantallas de negocio, **haz estas preguntas** (las que
@@ -163,8 +164,8 @@ TurboPre/
 - **Backend**: Render como Web Service desde la raíz del repo (no `apps/backend`,
   Render oculta los archivos fuera del root directory). `render.yaml` define el
   build, el start, el health check y las variables.
-- **Variables críticas en QA**: `AUTH_DEMO=false`, `JWT_SECRET` real,
-  `DATABASE_URL` y `CORS_ORIGIN` (soporta comas y comodines `https://*.vercel.app`).
+- **Variables críticas en QA**: `JWT_SECRET` real, `DATABASE_URL` y
+  `CORS_ORIGIN` (soporta comas y comodines `https://*.vercel.app`).
 - Tras cambiar el host del backend hay que actualizar el `destination` del
   rewrite en `apps/frontend/vercel.json` y redeployar el frontend.
 
@@ -176,5 +177,5 @@ TurboPre/
 - shadcn v4 no tiene componente `Form`: se usan `Controller` + `Field`.
 - Prisma 7 exige driver adapter (`@prisma/adapter-pg`) y genera el cliente en
   `src/generated/prisma`.
-- `AUTH_DEMO` vale `true` si no se define: en QA/producción hay que ponerlo en
-  `false` explícitamente.
+- El login requiere `DATABASE_URL` y que se haya ejecutado `pnpm db:seed`; no hay
+  usuario demo en memoria.

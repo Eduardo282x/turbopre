@@ -10,7 +10,7 @@ import type { DataTableColumn } from '@/components/table-kit/types';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { getRoutesWithRelations } from '@/features/preview/store/selectors';
+import { getRouteSheetsWithRelations } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import type { Client } from '@/features/preview/types';
@@ -36,9 +36,9 @@ export function ClientsPage() {
 
   if (!user) return null;
 
-  const routes = getRoutesWithRelations(db);
+  const routes = getRouteSheetsWithRelations(db);
   const rows: ClientRow[] = db.clients.map((client) => {
-    const clientRoutes = routes.filter((route) => route.clientId === client.id);
+    const clientRoutes = routes.filter((route) => route.client?.id === client.id);
     const last = clientRoutes
       .map((route) => route.updatedAt)
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
@@ -50,7 +50,7 @@ export function ClientsPage() {
     };
   });
 
-  const selectedRoutes = selected ? routes.filter((route) => route.clientId === selected.id) : [];
+  const selectedRoutes = selected ? routes.filter((route) => route.client?.id === selected.id) : [];
 
   const columns: DataTableColumn<ClientRow>[] = [
     {
@@ -171,7 +171,9 @@ export function ClientsPage() {
               >
                 <span className="min-w-0">
                   <span className="block font-medium text-foreground">{route.code}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{route.component.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {route.asset?.manufacturer} {route.asset?.model} · {route.equipmentCode}
+                  </span>
                 </span>
                 <RouteStatusBadge status={route.status} />
               </Link>

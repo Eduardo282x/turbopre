@@ -13,9 +13,11 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ROLE_BY_ID, ROLE_OPTIONS, getRoleDisplay } from '@/features/preview/config';
+import { DEMO_PASSWORD } from '@/features/preview/data/seed';
 import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { getInitials } from '@/lib/formatters';
+import { isPreviewMode } from '@/lib/preview';
 
 const formSchema = z.object({
   username: z.string().min(1, 'Ingresa tu nombre de usuario'),
@@ -23,7 +25,6 @@ const formSchema = z.object({
 });
 
 type FormInput = z.infer<typeof formSchema>;
-const DEMO_PASSWORD = 'demo1234';
 const CURRENT_YEAR = new Date().getFullYear();
 
 export function LoginPage() {
@@ -54,8 +55,6 @@ export function LoginPage() {
     signIn(user.id);
     logLogin(user.id);
     if (!remember) {
-      // The session store persists by default; remove the stored copy so the
-      // next reload asks for login again when "Recordarme" is unchecked.
       window.localStorage.removeItem('turbopre.preview.session');
     }
     toast.success(`Bienvenido, ${user.name}`, { description: getRoleDisplay(user) });
@@ -68,7 +67,13 @@ export function LoginPage() {
     );
     if (!user) {
       toast.error('Usuario no encontrado', {
-        description: 'Prueba con uno de los accesos rápidos o usa un usuario del listado.',
+        description: 'Verifica el nombre de usuario entregado por el administrador.',
+      });
+      return;
+    }
+    if (user.password !== values.password) {
+      toast.error('Contraseña incorrecta', {
+        description: 'Contacta al administrador si no recuerdas tu acceso.',
       });
       return;
     }
@@ -87,21 +92,25 @@ export function LoginPage() {
     >
       <div className="absolute inset-0 bg-[#0a0e14]/70 backdrop-blur-[3px]" aria-hidden="true" />
 
-      <div className="relative z-10 w-full max-w-5xl">
-        <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl lg:grid-cols-[1.05fr_0.95fr]">
+      <div className={`relative z-10 w-full ${isPreviewMode ? 'max-w-5xl' : 'max-w-xl'}`}>
+        <div
+          className={`grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl ${
+            isPreviewMode ? 'lg:grid-cols-[1.05fr_0.95fr]' : ''
+          }`}
+        >
           <section className="flex flex-col justify-between gap-8 p-7 sm:p-10">
             <div className="space-y-5">
               <BrandLogo className="h-10 brightness-0 invert" />
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                  TurboPre · MES
+                  TurboPre Services · CAMI
                 </p>
                 <h1 className="font-heading text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                  Bienvenido
+                  Bienvenido al sistema CAMI
                 </h1>
                 <p className="max-w-md text-sm leading-relaxed text-zinc-300">
-                  Ingresa tus credenciales para acceder al centro de control de hojas de ruta,
-                  componentes, partes y repuestos.
+                  Control Automatizado de Mantenimiento Industrial con integración de IA. Gestiona órdenes de
+                  servicio, inspecciones y hojas de ruta en un solo flujo.
                 </p>
               </div>
             </div>
@@ -182,54 +191,65 @@ export function LoginPage() {
                 <LogIn /> Iniciar sesión
               </Button>
 
-              <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-                <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
-                Modo preview sin backend. Contraseña demo: <span className="font-mono text-zinc-200">{DEMO_PASSWORD}</span>
-              </p>
+              {isPreviewMode ? (
+                <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                  <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
+                  Modo demo/QA. Contraseña de los usuarios de prueba:{' '}
+                  <span className="font-mono text-zinc-200">{DEMO_PASSWORD}</span>. En producción no se muestran
+                  accesos rápidos.
+                </p>
+              ) : (
+                <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                  <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
+                  El acceso es creado por el administrador del sistema. No hay auto-registro.
+                </p>
+              )}
             </form>
           </section>
 
-          <section className="border-t border-white/10 bg-black/20 p-6 lg:border-t-0 lg:border-l sm:p-8">
-            <div className="mb-4 space-y-1">
-              <p className="font-heading text-sm font-semibold text-white">Acceso rápido</p>
-              <p className="text-xs text-zinc-400">
-                Entra como cualquier rol para revisar su navegación y permisos.
-              </p>
-            </div>
-            <ScrollArea className="h-[460px] pr-3">
-              <div className="space-y-5">
-                {grouped.map(({ role, users: roleUsers }) => (
-                  <div key={role.id}>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                      {ROLE_BY_ID[role.id].label}
-                    </p>
-                    <div className="space-y-1">
-                      {roleUsers.map((user) => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => enterAs(user.id)}
-                          className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
-                        >
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
-                            {getInitials(user.name)}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-zinc-100">{user.name}</span>
-                            <span className="block truncate text-[11px] text-zinc-400">{getRoleDisplay(user)}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+          {isPreviewMode && (
+            <section className="border-t border-white/10 bg-black/20 p-6 lg:border-t-0 lg:border-l sm:p-8">
+              <div className="mb-4 space-y-1">
+                <p className="font-heading text-sm font-semibold text-white">Acceso rápido de QA</p>
+                <p className="text-xs text-zinc-400">
+                  Solo visible en desarrollo. Permite revisar la navegación y permisos de cada rol.
+                </p>
               </div>
-            </ScrollArea>
-          </section>
+              <ScrollArea className="h-[460px] pr-3">
+                <div className="space-y-5">
+                  {grouped.map(({ role, users: roleUsers }) => (
+                    <div key={role.id}>
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                        {ROLE_BY_ID[role.id].label}
+                      </p>
+                      <div className="space-y-1">
+                        {roleUsers.map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            onClick={() => enterAs(user.id)}
+                            className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                          >
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
+                              {getInitials(user.name)}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-zinc-100">{user.name}</span>
+                              <span className="block truncate text-[11px] text-zinc-400">{getRoleDisplay(user)}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </section>
+          )}
         </div>
 
         <p className="mt-5 text-center text-[11px] text-white/45">
-          © {CURRENT_YEAR} Turbopre Services — Innovación y trazabilidad en taller
+          © {CURRENT_YEAR} TurboPre Services — Automatización y trazabilidad en taller
         </p>
       </div>
     </div>

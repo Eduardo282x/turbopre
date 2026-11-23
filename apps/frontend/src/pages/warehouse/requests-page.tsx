@@ -1,111 +1,104 @@
-import { Package, Truck } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, Package, ShoppingCart, Truck } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { StatusBadge } from '@/components/common/status-badge';
-import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import {
+  SpareDestinationBadge,
+  SpareItemStatusBadge,
+} from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
-import { getWarehouseRequests } from '@/features/preview/store/selectors';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  getProcurePendingItems,
+  getWarehousePendingItems,
+  type WarehouseItem,
+} from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { Component, RouteSheet, SparePart } from '@/features/preview/types';
 import { formatDate } from '@/lib/formatters';
-
-interface RequestGroup {
-  routeId: string;
-  route?: RouteSheet;
-  component?: Component;
-  requester: string;
-  requestedAt: string;
-  items: SparePart[];
-  pending: number;
-}
 
 export function RequestsPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const updateSparePartStatus = usePreviewStore((state) => state.updateSparePartStatus);
-  const [dispatching, setDispatching] = useState<RequestGroup | null>(null);
+  const updateSpareItemStatus = usePreviewStore((state) => state.updateSpareItemStatus);
+  const [destination, setDestination] = useState('all');
+
+  const warehouse = getWarehousePendingItems(db);
+  const procure = getProcurePendingItems(db);
+  const rows = useMemo(
+    () => [...warehouse, ...procure].filter((row) => destination === 'all' || row.item.destination === destination),
+    [warehouse, procure, destination],
+  );
 
   if (!user) return null;
+  const dispatched = db.spareRequests.flatMap((request) => request.items).filter((item) => item.status === 'DISPATCHED').length;
+  const received = db.spareRequests.flatMap((request) => request.items).filter((item) => item.status === 'RECEIVED').length;
 
-  const requests = getWarehouseRequests(db);
-  const grouped = new Map<string, SparePart[]>();
-  requests.forEach((spare) => {
-    const list = grouped.get(spare.routeSheetId) ?? [];
-    list.push(spare);
-    grouped.set(spare.routeSheetId, list);
-  });
-
-  const groups: RequestGroup[] = [...grouped.entries()].map(([routeId, items]) => {
-    const route = db.routeSheets.find((item) => item.id === routeId);
-    const component = route ? db.components.find((item) => item.id === route.componentId) : undefined;
-    const requester = db.users.find((candidate) => candidate.id === items[0]?.requestedBy)?.name ?? '—';
-    return {
-      routeId,
-      route,
-      component,
-      requester,
-      requestedAt: items[0]?.requestedAt ?? '',
-      items,
-      pending: items.filter((item) => item.status === 'PENDING').length,
-    };
-  });
-
-  const columns: DataTableColumn<RequestGroup>[] = [
+  const columns: DataTableColumn<WarehouseItem>[] = [
     {
-      id: 'route',
-      header: 'Hoja de ruta',
-      cell: (group) => (
+      id: 'request',
+      header: 'Solicitud / hoja',
+      cell: (row) => (
         <div className="min-w-0">
-          <p className="font-semibold text-foreground">{group.route?.code ?? '—'}</p>
-          <p className="max-w-56 truncate text-xs text-muted-foreground">{group.component?.name ?? '—'}</p>
+          <p className="font-semibold text-foreground">{row.request.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">{row.route?.code ?? '—'}</p>
         </div>
       ),
       sortable: true,
-      sortValue: (group) => group.route?.code ?? '',
+      sortValue: (row) => row.request.code,
     },
     {
-      id: 'requester',
-      header: 'Solicitante',
-      cell: (group) => (
+      id: 'item',
+      header: 'Repuesto / material',
+      cell: (row) => (
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">
+            {row.item.quantity}× {row.item.name}
+          </p>
+          <p className="font-mono text-xs text-muted-foreground">{row.item.code}</p>
+        </div>
+      ),
+      sortable: true,
+      sortValue: (row) => row.item.name,
+    },
+    {
+      id: 'client',
+      header: 'Cliente / equipo',
+      cell: (row) => (
         <div className="text-xs">
-          <p className="text-foreground">{group.requester}</p>
-          <p className="text-muted-foreground">{group.requestedAt ? formatDate(group.requestedAt) : '—'}</p>
+          <p className="text-foreground">{row.serviceOrder ? db.clients.find((client) => client.id === row.serviceOrder?.clientId)?.name ?? '—' : '—'}</p>
+          <p className="text-muted-foreground">{row.route?.equipmentCode ?? '—'}</p>
         </div>
       ),
       hideOnMobile: true,
     },
     {
-      id: 'items',
-      header: 'Materiales',
-      cell: (group) => (
-        <ul className="max-w-72 space-y-1 text-xs">
-          {group.items.map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-2">
-              <span className="truncate text-foreground">
-                <strong>{item.quantity}×</strong> {item.name}
-              </span>
-              <StatusBadge tone={item.status === 'PENDING' ? 'warning' : 'info'} className="shrink-0 text-[10px]">
-                {item.status === 'PENDING' ? 'Pendiente' : 'Aprobado'}
-              </StatusBadge>
-            </li>
-          ))}
-        </ul>
-      ),
+      id: 'destination',
+      header: 'Destino',
+      cell: (row) => <SpareDestinationBadge destination={row.item.destination} />,
     },
     {
       id: 'status',
-      header: 'Resumen',
-      cell: (group) => (
-        <div className="text-xs">
-          <p className="text-foreground">{group.items.length} ítems</p>
-          <p className="text-muted-foreground">{group.pending} pendientes</p>
-        </div>
-      ),
+      header: 'Estado',
+      cell: (row) => <SpareItemStatusBadge status={row.item.status} />,
+      sortable: true,
+      sortValue: (row) => row.item.status,
+    },
+    {
+      id: 'date',
+      header: 'Solicitada',
+      cell: (row) => <span className="text-xs text-muted-foreground">{formatDate(row.request.requestedAt)}</span>,
       hideOnMobile: true,
+      sortable: true,
+      sortValue: (row) => new Date(row.request.requestedAt),
     },
   ];
 
@@ -114,53 +107,73 @@ export function RequestsPage() {
       <PageHeader
         eyebrow="Almacén"
         title="Solicitudes de taller"
-        description="Pedidos de repuestos agrupados por hoja de ruta, listos para despacho."
+        description="Despacha materiales del inventario y registra la llegada de los ítems que van a Procura."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <KpiCard label="Órdenes pendientes" value={groups.length} hint="Hojas con materiales por despachar" icon={Package} tone="warning" />
-        <KpiCard label="Ítems por despachar" value={requests.length} hint="Repuestos en cola" icon={Truck} tone="accent" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard label="En almacén" value={warehouse.length} hint="Por aprobar o despachar" icon={Package} tone="warning" />
+        <KpiCard label="En procura" value={procure.length} hint="Esperando compra o recepción" icon={ShoppingCart} tone="accent" />
+        <KpiCard label="Despachados" value={dispatched} hint="Entregados al taller" icon={Truck} tone="success" />
+        <KpiCard label="Recibidos de procura" value={received} hint="Ingresados al inventario" icon={CheckCircle2} tone="info" />
       </div>
 
       <DataTable
-        data={groups}
+        data={rows}
         columns={columns}
-        getRowId={(group) => group.routeId}
+        getRowId={(row) => `${row.request.id}-${row.item.id}`}
         search={{
-          placeholder: 'Buscar por hoja, componente o solicitante…',
-          getText: (group) => `${group.route?.code ?? ''} ${group.component?.name ?? ''} ${group.requester}`,
+          placeholder: 'Buscar por solicitud, hoja, repuesto o código…',
+          getText: (row) =>
+            `${row.request.code} ${row.route?.code ?? ''} ${row.item.name} ${row.item.code}`,
         }}
+        filters={
+          <Select value={destination} onValueChange={setDestination}>
+            <SelectTrigger size="sm" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los destinos</SelectItem>
+              <SelectItem value="WAREHOUSE">Almacén</SelectItem>
+              <SelectItem value="PROCURE">Procura</SelectItem>
+            </SelectContent>
+          </Select>
+        }
         actions={[
           {
-            label: 'Despachar todo',
+            label: 'Aprobar',
+            icon: CheckCircle2,
+            hidden: (row) =>
+              row.item.destination !== 'WAREHOUSE' || row.item.status !== 'PENDING',
+            onSelect: (row) => {
+              updateSpareItemStatus(row.request.id, row.item.id, 'APPROVED', user.id);
+              toast.success(`${row.item.name} aprobado`);
+            },
+          },
+          {
+            label: 'Despachar',
             icon: Truck,
-            onSelect: (group) => setDispatching(group),
+            hidden: (row) =>
+              row.item.destination !== 'WAREHOUSE' || row.item.status === 'DISPATCHED',
+            onSelect: (row) => {
+              updateSpareItemStatus(row.request.id, row.item.id, 'DISPATCHED', user.id);
+              toast.success(`${row.item.name} despachado al taller`);
+            },
+          },
+          {
+            label: 'Recibir de Procura',
+            icon: CheckCircle2,
+            hidden: (row) =>
+              row.item.destination !== 'PROCURE' || row.item.status === 'RECEIVED',
+            onSelect: (row) => {
+              updateSpareItemStatus(row.request.id, row.item.id, 'RECEIVED', user.id);
+              toast.success(`${row.item.name} ingresado al inventario`);
+            },
           },
         ]}
-        pageSize={10}
+        pageSize={12}
         emptyTitle="Sin solicitudes pendientes"
-        emptyDescription="Los pedidos de repuestos aparecerán aquí cuando el taller los cree."
-        caption="Solicitudes de repuestos agrupadas"
-      />
-
-      <ConfirmDialog
-        open={Boolean(dispatching)}
-        onOpenChange={(open) => {
-          if (!open) setDispatching(null);
-        }}
-        title="Despachar materiales"
-        description={`Se marcarán ${dispatching?.items.length ?? 0} repuesto(s) como despachados para ${dispatching?.route?.code ?? 'la hoja'}. Confirma que el material físico fue entregado.`}
-        confirmLabel="Sí, despachar"
-        onConfirm={() => {
-          if (!dispatching) return;
-          dispatching.items.forEach((item) => {
-            if (item.status !== 'DISPATCHED') {
-              updateSparePartStatus(item.id, 'DISPATCHED', user.id);
-            }
-          });
-          toast.success('Materiales despachados al taller');
-          setDispatching(null);
-        }}
+        emptyDescription="Cuando taller solicite repuestos, aparecerán aquí."
+        caption="Solicitudes de repuestos del taller"
       />
     </div>
   );

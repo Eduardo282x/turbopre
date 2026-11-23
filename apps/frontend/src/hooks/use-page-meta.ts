@@ -2,34 +2,27 @@ import { useLocation } from 'react-router';
 import { findNavItem } from '@/lib/navigation';
 
 const SUBTITLES: Record<string, string> = {
-  '/': 'Resumen general del taller, hojas de ruta y carga por área.',
-  '/expedientes': 'Expedientes de taller, campo, proyectos y suministro.',
-  '/mis-tareas': 'Fases asignadas a tu área y pendientes por ejecutar.',
-  '/aprobaciones': 'Hojas de ruta pendientes de revisión técnica.',
-  '/hojas-de-ruta': 'Orquestación de componentes, partes, repuestos y fases.',
-  '/hojas-de-ruta/historial': 'Hojas de ruta aprobadas, ejecutadas y entregadas.',
-  '/ventas': 'Estado de las hojas de ruta y compromisos de entrega.',
+  '/': 'Resumen de órdenes de servicio, inspecciones, hojas de ruta y carga por proceso.',
+  '/ordenes-servicio': 'Órdenes creadas por Ventas: cliente, equipo, alcance y prioridad.',
+  '/mis-tareas': 'Hojas completas donde tienes tareas; solo tu tarea de la etapa activa se puede marcar lista.',
+  '/aprobaciones': 'Hojas de ruta pendientes de la aprobación del Gerente.',
+  '/hojas-de-ruta': 'Secuencia de tareas por etapa y puesto. La inspección aprobada se copia como primeros pasos.',
+  '/historial': 'Órdenes de servicio y hojas de ruta con su estado y fechas clave.',
+  '/ventas': 'Órdenes de servicio, compromisos de entrega y estado de los clientes.',
   '/ventas/clientes': 'Cartera de clientes y su actividad reciente.',
-  '/taller': 'Secciones especializadas, carga y expedientes de taller.',
-  '/taller/inspecciones': 'Solicitudes y fases de inspección de las áreas.',
-  '/taller/repuestos': 'Solicitudes de repuestos para las hojas activas.',
-  '/campo': 'Sitios, permisos, cuadrillas y movilizaciones de campo.',
-  '/proyectos': 'Ingeniería, procura, construcción y comisionamiento.',
-  '/suministro': 'Componentes, proveedores y entregas de suministro.',
+  '/taller': 'Inspecciones, procesos de taller y carga de trabajo por puesto.',
+  '/taller/inspecciones': 'Inspecciones creadas desde la ODS y tareas por proceso, puesto y etapa.',
+  '/taller/repuestos': 'Solicitudes multi-línea: Almacén o Procura según disponibilidad.',
+  '/proyectos': 'Cartera de proyectos de ingeniería y su avance por hitos.',
   '/almacen/inventario': 'Existencias, ubicaciones y disponibilidad.',
-  '/almacen/solicitudes': 'Pedidos de taller e ingeniería pendientes de despacho.',
+  '/almacen/solicitudes': 'Solicitudes de taller por despachar o recibir de Procura.',
   '/almacen/prestamos': 'Entregas y devoluciones de herramientas.',
   '/almacen/calibracion': 'Instrumentos, certificados y vencimientos de calibración.',
-  '/calidad/tareas': 'Fases de calidad y evidencias pendientes de revisión.',
-  '/calidad/visto-bueno': 'Hojas de ruta pendientes del visto bueno final.',
-  '/calidad/registros': 'Registros NDT, pruebas eléctricas, dimensionales y de balanceo.',
-  '/calidad/no-conformidades': 'Hallazgos, acciones correctivas y cierre.',
-  '/calidad/historial': 'Equipos aprobados y listos para entrega.',
-  '/analitica/rendimiento': 'Tiempos, carga y productividad por área.',
-  '/planta': 'Ubicación física de las hojas de ruta activas.',
-  '/administracion/usuarios': 'Usuarios, roles y áreas operativas.',
+  '/analitica/rendimiento': 'Carga y tiempos por proceso y puesto.',
+  '/planta': 'Ubicación física de las hojas activas según su etapa actual.',
+  '/administracion/usuarios': 'Usuarios, roles y puestos de trabajo.',
   '/administracion/auditoria': 'Registro histórico de acciones del sistema.',
-  '/ajustes': 'Perfil, tema, datos de prueba y preferencias.',
+  '/ajustes': 'Perfil, tema y datos de demostración.',
 };
 
 export interface PageMeta {
@@ -39,21 +32,35 @@ export interface PageMeta {
 
 export function usePageMeta(): PageMeta {
   const { pathname } = useLocation();
-  if (pathname.startsWith('/hojas-de-ruta/') && pathname !== '/hojas-de-ruta/historial') {
+
+  if (pathname.startsWith('/ordenes-servicio/')) {
     return {
-      title: 'Detalle de hoja de ruta',
-      subtitle: 'Partes, repuestos, fases, evidencias y auditoría del expediente.',
+      title: 'Detalle de la orden de servicio',
+      subtitle: 'Cliente, equipo, inspección, hoja de ruta e historial.',
     };
   }
-  if (pathname.startsWith('/expedientes/')) {
+  if (pathname === '/hojas-de-ruta/nueva') {
     return {
-      title: 'Detalle del expediente',
-      subtitle: 'Activo, hoja de ruta, calidad, no conformidades y operación.',
+      title: 'Nueva hoja de ruta',
+      subtitle: 'Cabezal, inspección de origen y tareas por etapa y puesto.',
     };
   }
+  if (pathname.startsWith('/hojas-de-ruta/') && pathname !== '/hojas-de-ruta') {
+    return {
+      title: 'Detalle de la hoja de ruta',
+      subtitle: 'Cabezal, tareas, repuestos, anexos, calidad e historial.',
+    };
+  }
+  if (pathname.startsWith('/taller/inspecciones/')) {
+    return {
+      title: 'Detalle de la inspección',
+      subtitle: 'Hallazgos, tareas por etapa y aprobación de Taller.',
+    };
+  }
+
   const item = findNavItem(pathname);
   return {
-    title: item?.label ?? 'TurboPre',
-    subtitle: SUBTITLES[item?.to ?? pathname] ?? 'Sistema de gestión de componentes de turbinas.',
+    title: item?.label ?? 'CAMI',
+    subtitle: SUBTITLES[item?.to ?? pathname] ?? 'Control Automatizado de Mantenimiento Industrial.',
   };
 }

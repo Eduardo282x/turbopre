@@ -258,9 +258,17 @@ body {
   }
 }
 
+.print-only {
+  display: none;
+}
+
 @media print {
-  .no-print {
+  .no-print,
+  .screen-only {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   body {
     background: #ffffff !important;

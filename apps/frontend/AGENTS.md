@@ -4,11 +4,10 @@
 
 ## Contexto de producto
 
-La interfaz es el panel de gestión de **hojas de ruta** de una empresa de
-componentes de turbinas. Las pantallas de negocio girarán en torno a hojas de
-ruta, componentes, partes, repuestos, áreas/fases y usuarios con distintos roles.
-El equipo tiene un **mockup** que se adaptará más adelante: cuando llegue, léelo y
-pregunta antes de reescribir rutas, navegación o formularios existentes.
+CAMI es el panel de gestión de mantenimiento industrial de TurboPre Services. La
+columna vertebral es **Orden de Servicio → Inspección → Hoja de ruta → Anexos →
+Calidad → Entrega**. Las pantallas giran en torno a órdenes de servicio, equipos,
+inspecciones, tareas por proceso/puesto, repuestos y usuarios con distintos roles.
 
 Antes de crear pantallas nuevas, confirma con el usuario: ruta, roles con acceso,
 estados que se muestran, acciones disponibles y qué datos son reales vs. mock.
@@ -41,6 +40,9 @@ src/
   correspondiente. No guardes respuestas de API en zustand.
 - **HTTP** solo a través de `services/api.ts` y de `services/<dominio>/…service.ts`.
   Nunca `fetch`/axios suelto dentro de un componente.
+- La API responde `{ success, statusCode, message, data }`. Tipa la llamada como
+  `ApiSuccess<T>` (de `@turbopre/shared`) y devuelve `response.data.data` desde el
+  service; los componentes reciben el dato plano.
 - **Global state** con zustand (sesión, preferencias). Usa selectores
   (`useAuthStore((s) => s.user)`).
 - Tipos y esquemas de validación vienen de `@turbopre/shared`; no dupliques
@@ -69,25 +71,35 @@ src/
 
 - El token vive en `useAuthStore` (persistido) y el interceptor de Axios lo
   adjunta. Ante un `401` el interceptor cierra sesión y redirige a `/login`.
-- El login real está pendiente de conectar a PostgreSQL; hoy funciona contra el
-  usuario demo del backend (`admin@turbopre.dev / Admin123!`).
+- El frontend sigue en **modo preview** y no consume el backend. La sesión y los
+  datos viven en `src/features/preview/` (zustand + `localStorage`).
+- El login del preview valida usuario y contraseña contra la semilla
+  (`demo1234`). El administrador crea usuarios y entrega sus credenciales.
+- En desarrollo/QA se muestran accesos rápidos y cambio de usuario para probar
+  cada rol. En producción esos controles no aparecen (ver `isPreviewMode`).
 
 ## Modo preview (estado actual)
 
-- El frontend del mockup está adaptado y **no** consume el backend. La sesión y
-  los datos viven en `src/features/preview/` (zustand + `localStorage`).
-- La entidad central es el **expediente de servicio** (`ServiceOrder`), con modos
-  `SHOP`, `FIELD`, `PROJECT` y `SUPPLY`; la hoja de ruta es su plan de ejecución.
-- Roles del preview: Usuario Global, Planificación y Diseño, Ingeniería, Ventas,
-  Taller, Jefe de Sección, Operador por área, Almacén, Calidad, NDT, Metrología,
-  Campo, Proyecto, HSE y Procura.
-- El ciclo de la hoja de ruta es Borrador → En revisión → Aprobada → En
-  ejecución → En calidad → Lista para entrega → Entregada.
-- Módulos añadidos sobre el mockup: expedientes, activos, campo, proyectos,
-  suministro, registros NDT/pruebas, no conformidades y calibración.
-- El login de vidrio permite entrar con cualquier usuario del listado y cambiar
-  de usuario desde el header. Configuración → **Restablecer datos** vuelve a la
-  semilla.
+- El frontend de CAMI **no** consume el backend. La sesión y los datos viven en
+  `src/features/preview/` (zustand + `localStorage`).
+- La columna vertebral es **ODS → Inspección → Hoja de ruta → Anexos → Calidad →
+  Entrega**. La entidad de entrada es la **Orden de Servicio** (`ServiceOrder`),
+  no el antiguo “expediente” con modos `SHOP/FIELD/PROJECT/SUPPLY`.
+- Roles del preview: Administrador (`GLOBAL`), Ventas, Taller, Ingeniería,
+  Operador, Calidad, Gerente de Proyecto y Almacén.
+- La hoja de ruta es una secuencia de tareas por **etapa**, **proceso** y
+  **puesto**, sin el concepto de “partes”. Las tareas de una etapa se ejecutan en
+  paralelo; la siguiente se desbloquea al completar la anterior.
+- Ciclo de la hoja: Borrador → Pendiente de aprobación → Aprobada → En ejecución
+  → En anexos → En calidad → Lista para entrega → Entregada.
+- La inspección se copia a la hoja de ruta como primeros pasos ya realizados.
+- Módulos actuales: órdenes de servicio, inspecciones, hojas de ruta, repuestos
+  multi-línea, proyectos, inventario, solicitudes, préstamos, calibración,
+  rendimiento, mapa de planta, usuarios, auditoría y configuración.
+- Se retiraron campo, suministro, NDT, no conformidades, jefes de sección,
+  metrología y Procura como rol. Procura es solo un destino de repuestos.
+- El login de vidrio muestra accesos rápidos solo en QA. Configuración →
+  **Restablecer datos** vuelve a la semilla (`turbopre.cami.preview.v2`).
 - La tabla reutilizable está en `src/components/table-kit/` y las gráficas en
   `src/components/charts/` (shadcn Chart + Recharts).
 - Detalles y modelo provisional: `docs/preview-frontend.md`.

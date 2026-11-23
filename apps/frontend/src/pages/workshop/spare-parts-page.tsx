@@ -1,10 +1,15 @@
-import { CheckCircle2, Package, Plus, Truck } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, Package, Plus, ShoppingCart, Truck } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { toast } from 'sonner';
-import { SparePartStatusBadge } from '@/components/common/badges';
-import { FormDialog } from '@/components/common/form-dialog';
+import {
+  SpareDestinationBadge,
+  SpareItemStatusBadge,
+} from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
+import { SectionCard } from '@/components/common/section-card';
+import { SpareRequestDialog } from '@/components/tasks/spare-request-dialog';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
 import { Button } from '@/components/ui/button';
@@ -15,209 +20,188 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AREA_BY_ID } from '@/features/preview/config';
+import { getRouteSheetsWithRelations } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { Component, RouteSheet, SparePart } from '@/features/preview/types';
+import type { NewSpareRequestInput, RouteSheet, SpareItem, SpareRequest } from '@/features/preview/types';
 import { formatDate } from '@/lib/formatters';
-import { canDispatchSparePart, canRequestSparePart } from '@/lib/permissions';
-import { AddSparePartDialog } from '@/pages/route-sheets/add-spare-part-dialog';
+import { canRequestSparePart } from '@/lib/permissions';
 
-interface SpareRow extends SparePart {
+interface SpareRow {
+  request: SpareRequest;
+  item: SpareItem;
   route?: RouteSheet;
-  component?: Component;
 }
 
 export function SparePartsPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const addSparePart = usePreviewStore((state) => state.addSparePart);
-  const updateSparePartStatus = usePreviewStore((state) => state.updateSparePartStatus);
-  const [routeId, setRouteId] = useState('');
-  const [routeSelectOpen, setRouteSelectOpen] = useState(false);
-  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const createSpareRequest = usePreviewStore((state) => state.createSpareRequest);
+  const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const routes = getRouteSheetsWithRelations(db).filter((route) => route.status !== 'DELIVERED');
+  const rows: SpareRow[] = useMemo(
+    () =>
+      db.spareRequests
+        .flatMap((request) => {
+          const route = db.routeSheets.find((candidate) => candidate.id === request.routeSheetId);
+          return request.items.map((item) => ({ request, item, route }));
+        })
+        .sort((a, b) => new Date(b.request.requestedAt).getTime() - new Date(a.request.requestedAt).getTime()),
+    [db.spareRequests, db.routeSheets],
+  );
 
   if (!user) return null;
 
-  const rows: SpareRow[] = db.spareParts
-    .map((spare) => {
-      const route = db.routeSheets.find((item) => item.id === spare.routeSheetId);
-      return {
-        ...spare,
-        route,
-        component: route ? db.components.find((component) => component.id === route.componentId) : undefined,
-      };
-    })
-    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
-
-  const pending = rows.filter((row) => row.status === 'PENDING').length;
-  const approved = rows.filter((row) => row.status === 'APPROVED').length;
-  const dispatched = rows.filter((row) => row.status === 'DISPATCHED').length;
-
-  const candidateRoutes = db.routeSheets.filter((route) => canRequestSparePart(user, route));
-  const selectedRoute = db.routeSheets.find((route) => route.id === selectedRouteId);
-  const selectedParts = selectedRoute ? db.parts.filter((part) => part.routeSheetId === selectedRoute.id) : [];
+  const warehousePending = rows.filter(
+    (row) => row.item.destination === 'WAREHOUSE' && row.item.status !== 'DISPATCHED',
+  ).length;
+  const inProcure = rows.filter((row) => row.item.destination === 'PROCURE' && row.item.status !== 'RECEIVED').length;
+  const dispatched = rows.filter((row) => row.item.status === 'DISPATCHED').length;
 
   const columns: DataTableColumn<SpareRow>[] = [
     {
-      id: 'spare',
-      header: 'Repuesto',
+      id: 'request',
+      header: 'Solicitud / hoja',
       cell: (row) => (
         <div className="min-w-0">
-          <p className="font-medium text-foreground">{row.name}</p>
-          <p className="text-xs text-muted-foreground">{row.code}</p>
+          <p className="font-semibold text-foreground">{row.request.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {row.route?.code ?? '—'}
+          </p>
         </div>
       ),
       sortable: true,
-      sortValue: (row) => row.name,
+      sortValue: (row) => row.request.code,
     },
     {
-      id: 'route',
-      header: 'Hoja de ruta',
+      id: 'item',
+      header: 'Repuesto / material',
       cell: (row) => (
-        <div className="text-xs">
-          <p className="font-medium text-foreground">{row.route?.code ?? '—'}</p>
-          <p className="max-w-48 truncate text-muted-foreground">{row.component?.name ?? '—'}</p>
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">
+            {row.item.quantity}× {row.item.name}
+          </p>
+          <p className="font-mono text-xs text-muted-foreground">{row.item.code}</p>
         </div>
       ),
-      hideOnMobile: true,
       sortable: true,
-      sortValue: (row) => row.route?.code ?? '',
+      sortValue: (row) => row.item.name,
     },
     {
-      id: 'quantity',
-      header: 'Cantidad',
-      cell: (row) => <span className="font-mono text-sm">{row.quantity}</span>,
-      hideOnMobile: true,
-    },
-    {
-      id: 'area',
-      header: 'Área',
-      cell: (row) => <span className="text-xs">{AREA_BY_ID[row.areaId].shortName}</span>,
-      hideOnMobile: true,
+      id: 'destination',
+      header: 'Destino',
+      cell: (row) => <SpareDestinationBadge destination={row.item.destination} />,
     },
     {
       id: 'status',
       header: 'Estado',
-      cell: (row) => <SparePartStatusBadge status={row.status} />,
+      cell: (row) => <SpareItemStatusBadge status={row.item.status} />,
       sortable: true,
-      sortValue: (row) => row.status,
+      sortValue: (row) => row.item.status,
     },
     {
       id: 'requested',
-      header: 'Solicitado',
-      cell: (row) => <span className="text-xs text-muted-foreground">{formatDate(row.requestedAt)}</span>,
+      header: 'Solicitada',
+      cell: (row) => (
+        <div className="text-xs text-muted-foreground">
+          <p>{formatDate(row.request.requestedAt)}</p>
+          <p>{db.users.find((candidate) => candidate.id === row.request.requestedBy)?.name ?? '—'}</p>
+        </div>
+      ),
       hideOnMobile: true,
+      sortable: true,
+      sortValue: (row) => new Date(row.request.requestedAt),
     },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Taller y almacén"
+        eyebrow="Taller"
         title="Repuestos"
-        description="Solicitudes de materiales asociadas a las hojas de ruta activas."
-        actions={
-          <Button
-            onClick={() => {
-              setRouteId(candidateRoutes[0]?.id ?? '');
-              setRouteSelectOpen(true);
-            }}
-          >
-            <Plus /> Solicitar repuesto
-          </Button>
-        }
+        description="Solicitudes multi-línea. Si el material no tiene stock, se envía automáticamente a Procura."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Pendientes" value={pending} hint="Esperan aprobación" icon={Package} tone="warning" />
-        <KpiCard label="Aprobados" value={approved} hint="Listos para despacho" icon={CheckCircle2} tone="info" />
+        <KpiCard label="Pendientes en almacén" value={warehousePending} hint="Por aprobar o despachar" icon={Package} tone="warning" />
+        <KpiCard label="En procura" value={inProcure} hint="Sin stock en almacén" icon={ShoppingCart} tone="accent" />
         <KpiCard label="Despachados" value={dispatched} hint="Entregados al taller" icon={Truck} tone="success" />
       </div>
+
+      {canRequestSparePart(user) && (
+        <SectionCard
+          title="Nueva solicitud"
+          description="Selecciona la hoja de ruta y pide varios materiales en una sola solicitud."
+        >
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-72 flex-1">
+              <Select value={selectedRouteId} onValueChange={setSelectedRouteId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona una hoja de ruta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {routes.map((route) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      {route.code} · {route.client?.name ?? 'Sin cliente'} · {route.asset?.model ?? ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                if (!selectedRouteId) {
+                  toast.error('Selecciona una hoja de ruta');
+                  return;
+                }
+                setDialogOpen(true);
+              }}
+            >
+              <Plus /> Solicitar repuestos
+            </Button>
+          </div>
+        </SectionCard>
+      )}
+
+      {inProcure > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+          <ShoppingCart className="size-5 text-primary" />
+          <p className="flex-1 text-foreground">
+            Hay <strong>{inProcure}</strong> ítem(s) en Procura. El almacén los agregará al inventario cuando lleguen.
+          </p>
+          {user.role === 'GLOBAL' && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/almacen/solicitudes">
+                <CheckCircle2 /> Ver solicitudes
+              </Link>
+            </Button>
+          )}
+        </div>
+      )}
 
       <DataTable
         data={rows}
         columns={columns}
-        getRowId={(row) => row.id}
+        getRowId={(row) => `${row.request.id}-${row.item.id}`}
         search={{
-          placeholder: 'Buscar por repuesto, código u hoja de ruta…',
-          getText: (row) => `${row.name} ${row.code} ${row.route?.code ?? ''} ${row.component?.name ?? ''}`,
+          placeholder: 'Buscar por solicitud, hoja, repuesto o código…',
+          getText: (row) =>
+            `${row.request.code} ${row.route?.code ?? ''} ${row.item.name} ${row.item.code}`,
         }}
-        actions={[
-          {
-            label: 'Aprobar',
-            icon: CheckCircle2,
-            hidden: (row) => !canDispatchSparePart(user) || row.status !== 'PENDING',
-            onSelect: (row) => {
-              updateSparePartStatus(row.id, 'APPROVED', user.id);
-              toast.success(`${row.name} aprobado`);
-            },
-          },
-          {
-            label: 'Despachar',
-            icon: Truck,
-            hidden: (row) => !canDispatchSparePart(user) || row.status === 'DISPATCHED',
-            onSelect: (row) => {
-              updateSparePartStatus(row.id, 'DISPATCHED', user.id);
-              toast.success(`${row.name} despachado`);
-            },
-          },
-        ]}
         pageSize={10}
-        emptyTitle="Sin repuestos"
-        emptyDescription="Solicita materiales desde una hoja de ruta activa."
+        emptyTitle="Sin repuestos solicitados"
+        emptyDescription="Las solicitudes de materiales aparecerán aquí."
         caption="Solicitudes de repuestos"
       />
 
-      <FormDialog
-        open={routeSelectOpen}
-        onOpenChange={setRouteSelectOpen}
-        title="Seleccionar hoja de ruta"
-        description="La solicitud quedará asociada al componente y su expediente."
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setRouteSelectOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                if (!routeId) {
-                  toast.error('Selecciona una hoja de ruta');
-                  return;
-                }
-                setSelectedRouteId(routeId);
-                setRouteSelectOpen(false);
-                setAddOpen(true);
-              }}
-            >
-              Continuar
-            </Button>
-          </>
-        }
-      >
-        <Select value={routeId} onValueChange={setRouteId}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Selecciona una hoja de ruta" />
-          </SelectTrigger>
-          <SelectContent>
-            {candidateRoutes.map((route) => (
-              <SelectItem key={route.id} value={route.id}>
-                {route.code} · {db.components.find((component) => component.id === route.componentId)?.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormDialog>
-
-      <AddSparePartDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        parts={selectedParts}
-        onSubmit={(input) => {
-          if (!selectedRouteId) return;
-          addSparePart(selectedRouteId, input, user.id);
-          toast.success('Solicitud de repuesto enviada');
+      <SpareRequestDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSubmit={(input: NewSpareRequestInput) => {
+          createSpareRequest(selectedRouteId, input, user.id);
+          toast.success('Solicitud enviada: los ítems con stock van a Almacén y los demás a Procura');
         }}
       />
     </div>

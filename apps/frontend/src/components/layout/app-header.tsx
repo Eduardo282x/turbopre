@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { useClock } from '@/hooks/use-clock';
 import { usePageMeta } from '@/hooks/use-page-meta';
 import { formatTime } from '@/lib/formatters';
+import { isPreviewMode } from '@/lib/preview';
 import { AppSidebar } from './app-sidebar';
 import { PreviewRoleSwitcher } from './preview-role-switcher';
 import { ThemeToggle } from './theme-toggle';
@@ -53,8 +54,13 @@ export function AppHeader({ collapsed, onToggleCollapse }: AppHeaderProps) {
             {title}
           </p>
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
-            Modo preview
+            CAMI
           </Badge>
+          {isPreviewMode && (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+              Demo
+            </Badge>
+          )}
         </div>
         <p className="hidden truncate text-xs text-muted-foreground sm:block">{subtitle}</p>
       </div>
@@ -63,7 +69,7 @@ export function AppHeader({ collapsed, onToggleCollapse }: AppHeaderProps) {
         <Badge variant="outline" className="hidden font-mono text-[11px] tabular-nums md:inline-flex">
           {formatTime(now)}
         </Badge>
-        <PreviewRoleSwitcher />
+        {isPreviewMode && <PreviewRoleSwitcher />}
         <ThemeToggle />
         <UserMenu />
       </div>

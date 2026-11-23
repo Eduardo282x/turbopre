@@ -5,7 +5,6 @@
     "NODE_ENV",
     "DATABASE_URL",
     "JWT_SECRET",
-    "AUTH_DEMO",
     "PORT",
     "CORS_ORIGIN",
     "VITE_API_URL"

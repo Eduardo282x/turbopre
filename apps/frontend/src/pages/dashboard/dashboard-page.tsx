@@ -1,19 +1,26 @@
 import {
   Activity,
   ArrowRight,
+  BadgeCheck,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
   Clock3,
+  FileText,
   Plus,
+  ShieldCheck,
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { Link, Navigate, useNavigate } from 'react-router';
 import { ChartCard } from '@/components/charts/chart-card';
 import { DonutChart } from '@/components/charts/donut-chart';
-import { OperationsRadar, type OperationsRadarItem } from '@/components/charts/operations-radar';
 import { SimpleBarChart } from '@/components/charts/simple-bar-chart';
-import { RouteStatusBadge, ServiceModeBadge, ServiceOrderStatusBadge } from '@/components/common/badges';
+import {
+  PriorityBadge,
+  RouteStatusBadge,
+  ServiceOrderStatusBadge,
+} from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
 import { ProgressBar } from '@/components/common/progress-bar';
@@ -23,21 +30,18 @@ import type { DataTableColumn } from '@/components/table-kit/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AREA_BY_ID, ROUTE_STATUS_META } from '@/features/preview/config';
 import {
-  getAreaWorkloadData,
-  getClientVolumeData,
+  getApprovedInspectionsWithoutRoute,
+  getInspectionMetrics,
   getMyTasks,
   getPendingApprovals,
+  getProcessWorkloadData,
   getQualityQueue,
   getRouteMetrics,
-  getRoutesWithRelations,
-  getSalesStatusData,
+  getRouteStatusChartData,
   getServiceOrderMetrics,
   getServiceOrdersWithRelations,
-  getStatusChartData,
   getUpcomingDeliveries,
-  getWarehouseRequests,
 } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
@@ -46,95 +50,41 @@ import { daysUntil, formatDate } from '@/lib/formatters';
 import { canManageRoutes } from '@/lib/permissions';
 
 const rolePrompts = {
-  PLANNING: {
-    title: 'Bandeja de planificación',
-    description: 'Revisa las hojas en borrador y completa partes, fases y repuestos.',
-    action: 'Ir a hojas de ruta',
-    to: '/hojas-de-ruta',
-  },
-  ENGINEERING: {
-    title: 'Aprobaciones técnicas',
-    description: 'Hay hojas de ruta esperando revisión y liberación de Ingeniería.',
-    action: 'Ver aprobaciones',
-    to: '/aprobaciones',
+  GLOBAL: {
+    title: 'Visión global del sistema',
+    description: 'Todas las órdenes, inspecciones y hojas de ruta en un solo lugar.',
+    action: 'Ver órdenes de servicio',
+    to: '/ordenes-servicio',
   },
   WORKSHOP: {
     title: 'Coordinación de taller',
-    description: 'Supervisa las inspecciones y la ejecución de las fases en las áreas.',
+    description: 'Recibe las ODS, crea inspecciones y aprueba su alcance antes de Ingeniería.',
     action: 'Ver inspecciones',
     to: '/taller/inspecciones',
   },
+  ENGINEERING: {
+    title: 'Ingeniería y soporte técnico',
+    description: 'Crea hojas de ruta desde inspecciones aprobadas y coordina la ejecución técnica.',
+    action: 'Ver inspecciones aprobadas',
+    to: '/taller/inspecciones',
+  },
   OPERATOR: {
-    title: 'Tus tareas asignadas',
-    description: 'Consulta las fases de tu área y registra el avance con evidencia.',
+    title: 'Tus tareas de taller',
+    description: 'Abre la hoja completa y marca solo las tareas de tu puesto y etapa activa.',
     action: 'Ver mis tareas',
     to: '/mis-tareas',
   },
   QUALITY: {
-    title: 'Visto bueno de calidad',
-    description: 'Hay expedientes pendientes de revisión final y liberación.',
-    action: 'Ir a calidad',
-    to: '/calidad/visto-bueno',
-  },
-  WAREHOUSE: {
-    title: 'Solicitudes de almacén',
-    description: 'Despacha repuestos y mantén actualizado el inventario del taller.',
-    action: 'Ver solicitudes',
-    to: '/almacen/solicitudes',
-  },
-  SALES: {
-    title: 'Compromisos de entrega',
-    description: 'Consulta las hojas listas para entrega y confirma con el cliente.',
-    action: 'Ver panel de ventas',
-    to: '/ventas',
-  },
-  GLOBAL: {
-    title: 'Visión global',
-    description: 'Todas las áreas, hojas de ruta y eventos del sistema en un solo lugar.',
-    action: 'Ver auditoría',
-    to: '/administracion/auditoria',
-  },
-  FIELD: {
-    title: 'Servicios de campo',
-    description: 'Coordina movilizaciones, permisos, cuadrillas y reportes en sitio.',
-    action: 'Ver campo',
-    to: '/campo',
+    title: 'Calidad en la hoja de ruta',
+    description: 'Ejecuta tus tareas, revisa anexos y da el visto bueno final.',
+    action: 'Ver hojas en calidad',
+    to: '/hojas-de-ruta',
   },
   PROJECT: {
-    title: 'Proyectos electromecánicos',
-    description: 'Sigue ingeniería, procura, construcción y comisionamiento.',
-    action: 'Ver proyectos',
-    to: '/proyectos',
-  },
-  NDT: {
-    title: 'Ensayos no destructivos',
-    description: 'Registra NDT y libera componentes críticos.',
-    action: 'Ver registros',
-    to: '/calidad/registros',
-  },
-  METROLOGY: {
-    title: 'Metrología y calibración',
-    description: 'Controla instrumentos, calibraciones y vencimientos.',
-    action: 'Ver calibración',
-    to: '/almacen/calibracion',
-  },
-  HSE: {
-    title: 'Seguridad y ambiente',
-    description: 'Valida permisos, riesgos y aspectos ambientales de los trabajos.',
-    action: 'Ver campo',
-    to: '/campo',
-  },
-  PROCUREMENT: {
-    title: 'Procura y suministro',
-    description: 'Gestiona compras, proveedores y entregas de componentes.',
-    action: 'Ver suministro',
-    to: '/suministro',
-  },
-  SECTION_CHIEF: {
-    title: 'Jefatura de sección',
-    description: 'Coordina la ejecución de tu sección y la liberación de fases.',
-    action: 'Ver taller',
-    to: '/taller',
+    title: 'Aprobación y seguimiento',
+    description: 'Aprueba las hojas antes de liberarlas y sigue el rendimiento de la planta.',
+    action: 'Ver aprobaciones',
+    to: '/aprobaciones',
   },
 } as const;
 
@@ -144,55 +94,70 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   if (!user) return null;
+  if (user.role === 'SALES') return <Navigate to="/ventas" replace />;
+  if (user.role === 'WAREHOUSE') return <Navigate to="/almacen/inventario" replace />;
 
-  const metrics = getRouteMetrics(db);
-  const serviceMetrics = getServiceOrderMetrics(db);
+  const routeMetrics = getRouteMetrics(db);
+  const orderMetrics = getServiceOrderMetrics(db);
+  const inspectionMetrics = getInspectionMetrics(db);
+  const statusData = getRouteStatusChartData(db);
+  const workload = getProcessWorkloadData(db).filter((item) => item.value > 0);
   const recentOrders = getServiceOrdersWithRelations(db)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
-  const statusData = getStatusChartData(db);
-  const areaWorkload = getAreaWorkloadData(db).filter((item) => item.value > 0);
-  const topClients = getClientVolumeData(db);
-  const salesStatus = getSalesStatusData(db);
   const upcoming = getUpcomingDeliveries(db);
-  const activeRoutes = getRoutesWithRelations(db)
-    .filter((route) => ['APPROVED', 'IN_PROGRESS', 'IN_QUALITY'].includes(route.status))
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 5);
-
   const myTasks = getMyTasks(db, user);
   const approvals = getPendingApprovals(db);
-  const quality = getQualityQueue(db);
-  const requests = getWarehouseRequests(db);
+  const qualityQueue = getQualityQueue(db);
+  const approvedInspections = getApprovedInspectionsWithoutRoute(db);
+  const prompt = rolePrompts[user.role as keyof typeof rolePrompts];
 
-  const radarItems: OperationsRadarItem[] = activeRoutes.map((route) => {
-    const currentPhase =
-      route.phases.find((phase) => phase.status === 'IN_PROGRESS') ??
-      route.phases.find((phase) => phase.status === 'PENDING');
-    const responsible = db.users.find((candidate) => candidate.id === currentPhase?.responsibleId);
-    const meta = ROUTE_STATUS_META[route.status];
-    return {
-      id: route.id,
-      code: route.code,
-      component: route.component.name,
-      progress: route.progress,
-      area: currentPhase ? AREA_BY_ID[currentPhase.areaId].shortName : 'Sin área',
-      responsible: responsible?.name ?? 'Sin asignar',
-      statusLabel: meta.shortLabel,
-      tone: meta.tone,
-    };
-  });
+  const orderColumns: DataTableColumn<ServiceOrderWithRelations>[] = [
+    {
+      id: 'order',
+      header: 'Orden de servicio',
+      cell: (order) => (
+        <div className="min-w-0">
+          <p className="font-medium text-foreground">{order.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">{order.subCode}</p>
+        </div>
+      ),
+      sortable: true,
+      sortValue: (order) => order.code,
+    },
+    {
+      id: 'client',
+      header: 'Cliente / equipo',
+      cell: (order) => (
+        <div className="text-xs">
+          <p className="text-foreground">{order.client?.name ?? '—'}</p>
+          <p className="text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model}</p>
+        </div>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
+      hideOnMobile: true,
+    },
+    {
+      id: 'progress',
+      header: 'Avance',
+      cell: (order) => <ProgressBar value={order.progress} className="w-28" />,
+      hideOnMobile: true,
+    },
+  ];
 
-  const prompt = rolePrompts[user.role];
-
-  const columns: DataTableColumn<RouteSheetWithRelations>[] = [
+  const routeColumns: DataTableColumn<RouteSheetWithRelations>[] = [
     {
       id: 'route',
       header: 'Hoja de ruta',
       cell: (route) => (
         <div className="min-w-0">
           <p className="font-medium text-foreground">{route.code}</p>
-          <p className="truncate text-xs text-muted-foreground">{route.component.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{route.asset?.model}</p>
         </div>
       ),
       sortable: true,
@@ -203,8 +168,6 @@ export function DashboardPage() {
       header: 'Cliente',
       cell: (route) => <span className="text-sm">{route.client?.name ?? '—'}</span>,
       hideOnMobile: true,
-      sortable: true,
-      sortValue: (route) => route.client?.name ?? '',
     },
     {
       id: 'due',
@@ -230,47 +193,9 @@ export function DashboardPage() {
       hideOnMobile: true,
     },
     {
-      id: 'progress',
-      header: 'Avance',
-      cell: (route) => <ProgressBar value={route.progress} className="w-28" showValue />,
-      hideOnMobile: true,
-    },
-  ];
-
-  const orderColumns: DataTableColumn<ServiceOrderWithRelations>[] = [
-    {
-      id: 'order',
-      header: 'Expediente',
-      cell: (order) => (
-        <div className="min-w-0 space-y-1">
-          <p className="font-medium text-foreground">{order.code}</p>
-          <ServiceModeBadge mode={order.mode} />
-        </div>
-      ),
-      sortable: true,
-      sortValue: (order) => order.code,
-    },
-    {
-      id: 'client',
-      header: 'Cliente / activo',
-      cell: (order) => (
-        <div className="text-xs">
-          <p className="text-foreground">{order.client?.name ?? '—'}</p>
-          <p className="text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model}</p>
-        </div>
-      ),
-      hideOnMobile: true,
-    },
-    {
-      id: 'status',
-      header: 'Estado',
-      cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
-      hideOnMobile: true,
-    },
-    {
-      id: 'progress',
-      header: 'Avance',
-      cell: (order) => <ProgressBar value={order.progress} className="w-28" />,
+      id: 'priority',
+      header: 'Prioridad',
+      cell: (route) => <PriorityBadge priority={route.priority} />,
       hideOnMobile: true,
     },
   ];
@@ -280,18 +205,27 @@ export function DashboardPage() {
       <PageHeader
         eyebrow={`Hola, ${user.name.split(' ')[0]}`}
         title="Centro de control"
-        description="Resumen de hojas de ruta, carga por área y próximos compromisos de entrega."
+        description="Visión general de órdenes de servicio, inspecciones, hojas de ruta y compromisos de entrega."
         actions={
           <>
-            <Button variant="outline" asChild>
-              <Link to="/mis-tareas">
-                <ClipboardList /> Mis tareas
-              </Link>
-            </Button>
-            {canManageRoutes(user) && (
+            {user.role === 'ENGINEERING' && canManageRoutes(user) && (
               <Button asChild>
-                <Link to="/hojas-de-ruta?nueva=1">
+                <Link to="/hojas-de-ruta/nueva">
                   <Plus /> Nueva hoja de ruta
+                </Link>
+              </Button>
+            )}
+            {(user.role === 'OPERATOR' || user.role === 'QUALITY' || user.role === 'ENGINEERING') && (
+              <Button variant="outline" asChild>
+                <Link to="/mis-tareas">
+                  <ClipboardList /> Mis tareas
+                </Link>
+              </Button>
+            )}
+            {user.role === 'PROJECT' && (
+              <Button asChild>
+                <Link to="/aprobaciones">
+                  <BadgeCheck /> Aprobaciones
                 </Link>
               </Button>
             )}
@@ -300,18 +234,18 @@ export function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Hojas totales" value={metrics.total} hint="Expedientes en el sistema" icon={ClipboardList} tone="accent" />
-        <KpiCard label="En proceso" value={metrics.active} hint="Aprobadas, en taller o calidad" icon={Activity} tone="info" />
-        <KpiCard label="En calidad" value={metrics.inQuality} hint="Pendientes de visto bueno" icon={Clock3} tone="warning" />
-        <KpiCard label="Entregadas" value={metrics.delivered} hint="Compromisos cerrados" icon={CheckCircle2} tone="success" />
+        <KpiCard label="Órdenes de servicio" value={orderMetrics.total} hint="Recibidas de Ventas" icon={ClipboardList} tone="accent" />
+        <KpiCard label="Hojas activas" value={routeMetrics.active} hint="Aprobadas, en taller o calidad" icon={Activity} tone="info" />
+        <KpiCard label="En calidad" value={routeMetrics.inQuality} hint="Pendientes de visto bueno" icon={Clock3} tone="warning" />
+        <KpiCard label="Entregadas" value={routeMetrics.delivered} hint="Compromisos cerrados" icon={CheckCircle2} tone="success" />
       </div>
 
-      {metrics.critical > 0 && (
+      {routeMetrics.critical > 0 && (
         <Card className="border-destructive/30 bg-destructive/5 py-0">
           <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
             <TriangleAlert className="size-5 text-destructive" />
             <p className="flex-1 text-foreground">
-              Hay <strong>{metrics.critical}</strong> hoja(s) de ruta con prioridad crítica sin entregar.
+              Hay <strong>{routeMetrics.critical}</strong> hoja(s) con prioridad crítica sin entregar.
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link to="/hojas-de-ruta">Revisar prioridades</Link>
@@ -321,136 +255,92 @@ export function DashboardPage() {
       )}
 
       <div className="grid gap-4 xl:grid-cols-[0.6fr_1.4fr]">
-        <ChartCard title="Expedientes por modo" description="Taller, campo, proyectos y suministro.">
-          <DonutChart
-            data={[
-              { name: 'Taller', value: serviceMetrics.shop, color: '#00d1ff' },
-              { name: 'Campo', value: serviceMetrics.field, color: '#fb923c' },
-              { name: 'Proyectos', value: serviceMetrics.project, color: '#f472b6' },
-              { name: 'Suministro', value: serviceMetrics.supply, color: '#c084fc' },
-            ]}
-            centerValue={serviceMetrics.total}
-            centerLabel="expedientes"
-            height={260}
-          />
+        <ChartCard title="Hojas por estado" description="Distribución del ciclo de vida.">
+          <DonutChart data={statusData} centerValue={routeMetrics.total} centerLabel="hojas" height={260} />
         </ChartCard>
-        <SectionCard
-          title="Últimos expedientes"
-          description="Actividad reciente de taller, campo, proyectos y suministro."
-          contentClassName="p-0"
-        >
+        <SectionCard title="Últimas órdenes de servicio" description="Actividad reciente de Ventas." contentClassName="p-0">
           <DataTable
             data={recentOrders}
             columns={orderColumns}
             getRowId={(order) => order.id}
             pageSize={5}
             pageSizeOptions={[5, 10]}
-            onRowClick={(order) => navigate(`/expedientes/${order.id}`)}
-            emptyTitle="Sin expedientes"
-            emptyDescription="Crea un expediente para comenzar."
-            caption="Últimos expedientes de servicio"
+            onRowClick={(order) => navigate(`/ordenes-servicio/${order.id}`)}
+            emptyTitle="Sin órdenes"
+            emptyDescription="Ventas aún no ha creado órdenes de servicio."
+            caption="Últimas órdenes de servicio"
           />
         </SectionCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Flujo de hojas de ruta" description="Distribución por estado del ciclo de vida.">
-          <SimpleBarChart data={statusData} horizontal valueLabel="Hojas" height={280} />
+        <ChartCard title="Carga por proceso" description="Tareas pendientes o en proceso.">
+          <SimpleBarChart data={workload} horizontal height={280} valueLabel="Tareas" />
         </ChartCard>
-
-        {user.role === 'SALES' ? (
-          <ChartCard title="Estado de mis compromisos" description="Semáforo de entregas comerciales.">
-            <DonutChart
-              data={salesStatus}
-              centerValue={salesStatus.reduce((sum, item) => sum + item.value, 0)}
-              centerLabel="hojas"
-              height={280}
-            />
-          </ChartCard>
-        ) : (
-          <ChartCard title="Carga por área" description="Fases pendientes o en proceso por área.">
-            <DonutChart
-              data={areaWorkload}
-              centerValue={areaWorkload.reduce((sum, item) => sum + item.value, 0)}
-              centerLabel="fases activas"
-              height={280}
-            />
-          </ChartCard>
-        )}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
-        <ChartCard
-          title="Radar de operaciones"
-          description="¿Quién tiene la pelota en este momento?"
-          actions={
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/hojas-de-ruta">
-                Ver todas <ArrowRight />
+        <Card className="border-primary/20 bg-primary/5 py-0">
+          <CardContent className="space-y-3 p-5">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Sparkles className="size-5" />
+            </span>
+            <div className="space-y-1">
+              <p className="font-heading text-sm font-semibold">{prompt.title}</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">{prompt.description}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">{myTasks.length} tareas</Badge>
+              {user.role === 'PROJECT' && <Badge variant="outline">{approvals.length} aprobaciones</Badge>}
+              {(user.role === 'QUALITY' || user.role === 'GLOBAL') && <Badge variant="outline">{qualityQueue.length} en calidad</Badge>}
+              {user.role === 'ENGINEERING' && (
+                <Badge variant="outline">{approvedInspections.length} inspecciones sin hoja</Badge>
+              )}
+              {user.role === 'WORKSHOP' && (
+                <Badge variant="outline">{inspectionMetrics.completed} inspecciones por aprobar</Badge>
+              )}
+            </div>
+            <Button variant="outline" size="sm" asChild className="w-full">
+              <Link to={prompt.to}>
+                {prompt.action} <ArrowRight />
               </Link>
             </Button>
-          }
-          empty={radarItems.length === 0}
-          emptyMessage="No hay hojas de ruta activas en este momento."
-        >
-          <OperationsRadar items={radarItems} />
-        </ChartCard>
-
-        <div className="space-y-4">
-          <Card className="border-primary/20 bg-primary/5 py-0">
-            <CardContent className="space-y-3 p-5">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Sparkles className="size-5" />
-              </span>
-              <div className="space-y-1">
-                <p className="font-heading text-sm font-semibold">{prompt.title}</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">{prompt.description}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{myTasks.length} tareas</Badge>
-                {(user.role === 'ENGINEERING' || user.role === 'GLOBAL') && (
-                  <Badge variant="outline">{approvals.length} aprobaciones</Badge>
-                )}
-                {(user.role === 'QUALITY' || user.role === 'GLOBAL') && (
-                  <Badge variant="outline">{quality.length} en calidad</Badge>
-                )}
-                {(user.role === 'WAREHOUSE' || user.role === 'GLOBAL') && (
-                  <Badge variant="outline">{requests.length} solicitudes</Badge>
-                )}
-              </div>
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link to={prompt.to}>
-                  {prompt.action} <ArrowRight />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {user.role === 'SALES' && (
-            <ChartCard title="Top clientes" description="Mayor volumen de hojas de ruta.">
-              <SimpleBarChart data={topClients} horizontal height={220} valueLabel="Hojas" />
-            </ChartCard>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       <SectionCard
         title="Próximas entregas"
-        description="Hojas de ruta activas ordenadas por fecha compromiso."
+        description="Hojas activas ordenadas por fecha compromiso."
         contentClassName="p-0"
       >
         <DataTable
           data={upcoming}
-          columns={columns}
+          columns={routeColumns}
           getRowId={(route) => route.id}
           pageSize={5}
           pageSizeOptions={[5, 10]}
           onRowClick={(route) => navigate(`/hojas-de-ruta/${route.id}`)}
           emptyTitle="Sin entregas próximas"
-          emptyDescription="Cuando existan hojas de ruta activas aparecerán aquí."
-          caption="Próximas entregas de hojas de ruta"
+          emptyDescription="Cuando existan hojas activas aparecerán aquí."
+          caption="Próximas entregas"
         />
       </SectionCard>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Inspecciones en curso', value: inspectionMetrics.inProgress, icon: ClipboardCheck, tone: 'info' as const },
+          { label: 'Inspecciones por aprobar', value: inspectionMetrics.completed, icon: ShieldCheck, tone: 'warning' as const },
+          { label: 'Hojas por aprobar', value: routeMetrics.pendingApproval, icon: BadgeCheck, tone: 'warning' as const },
+          { label: 'Listas para entrega', value: routeMetrics.readyForDelivery, icon: FileText, tone: 'success' as const },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="rounded-xl border border-border/70 bg-card/70 p-4">
+              <Icon className="size-4 text-muted-foreground" />
+              <p className="mt-2 text-2xl font-bold text-foreground">{item.value}</p>
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

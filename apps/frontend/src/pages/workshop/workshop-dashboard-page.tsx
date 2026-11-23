@@ -1,134 +1,188 @@
-import { CheckCircle2, Eye, Factory, Gauge, Wrench } from 'lucide-react';
-import { useNavigate } from 'react-router';
-import { ServiceModeBadge, ServiceOrderStatusBadge } from '@/components/common/badges';
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  Factory,
+  Package,
+  Plus,
+  Timer,
+  Wrench,
+} from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { InspectionStatusBadge } from '@/components/common/badges';
 import { KpiCard } from '@/components/common/kpi-card';
 import { PageHeader } from '@/components/common/page-header';
 import { ProgressBar } from '@/components/common/progress-bar';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
-import { getAreaWorkloadData, getServiceOrderMetrics, getServiceOrdersWithRelations } from '@/features/preview/store/selectors';
+import { Button } from '@/components/ui/button';
+import { PROCESSES } from '@/features/preview/config';
+import {
+  getInspectionMetrics,
+  getInspectionsForWorkshop,
+  getProcessWorkloadData,
+  getRouteMetrics,
+  getServiceOrderMetrics,
+  getWarehousePendingItems,
+} from '@/features/preview/store/selectors';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { ServiceOrderWithRelations } from '@/features/preview/types';
+import type { InspectionWithRelations } from '@/features/preview/types';
 import { formatDate } from '@/lib/formatters';
 
 export function WorkshopDashboardPage() {
   const db = usePreviewStore((state) => state.db);
   const navigate = useNavigate();
-  const orders = getServiceOrdersWithRelations(db).filter((order) => order.mode === 'SHOP');
-  const metrics = getServiceOrderMetrics(db);
-  const workload = getAreaWorkloadData(db);
+  const inspections = getInspectionsForWorkshop(db);
+  const inspectionMetrics = getInspectionMetrics(db);
+  const orderMetrics = getServiceOrderMetrics(db);
+  const routeMetrics = getRouteMetrics(db);
+  const workload = getProcessWorkloadData(db);
+  const sparePending = getWarehousePendingItems(db).length;
 
-  const sections = [
-    { name: 'Izamiento y ensamble', areaId: 'assembly' as const },
-    { name: 'Mecanizado mayor', areaId: 'machining_major' as const },
-    { name: 'Mecanizado menor', areaId: 'machining_minor' as const },
-    { name: 'Balanceo', areaId: 'balancing' as const },
-    { name: 'Soldaduras especiales', areaId: 'special_welding' as const },
-    { name: 'Generadores eléctricos', areaId: 'generator_shop' as const },
-    { name: 'Tratamiento térmico y recubrimientos', areaId: 'thermal_coatings' as const },
-    { name: 'Metrología', areaId: 'metrology' as const },
-    { name: 'Almacén de materiales', areaId: 'material_warehouse' as const },
-    { name: 'Administración', areaId: 'admin' as const },
-  ];
-
-  const columns: DataTableColumn<ServiceOrderWithRelations>[] = [
+  const columns: DataTableColumn<InspectionWithRelations>[] = [
     {
-      id: 'order',
-      header: 'Expediente',
-      cell: (order) => (
-        <div className="min-w-0 space-y-1">
-          <p className="font-semibold text-foreground">{order.code}</p>
-          <p className="text-xs text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model} · {order.asset?.tag}</p>
-          <div className="flex flex-wrap gap-1">
-            <ServiceModeBadge mode={order.mode} />
-            <ServiceOrderStatusBadge status={order.status} />
-          </div>
+      id: 'inspection',
+      header: 'Inspección',
+      cell: (inspection) => (
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground">{inspection.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">ODS {inspection.serviceOrder.code}</p>
         </div>
       ),
       sortable: true,
-      sortValue: (order) => order.code,
+      sortValue: (inspection) => inspection.code,
     },
     {
-      id: 'scope',
-      header: 'Alcance',
-      cell: (order) => <span className="text-xs">{order.description}</span>,
+      id: 'client',
+      header: 'Cliente / equipo',
+      cell: (inspection) => (
+        <div className="text-xs">
+          <p className="font-medium text-foreground">{inspection.client?.name ?? '—'}</p>
+          <p className="text-muted-foreground">
+            {inspection.asset?.manufacturer} {inspection.asset?.model}
+          </p>
+        </div>
+      ),
       hideOnMobile: true,
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: (inspection) => <InspectionStatusBadge status={inspection.status} />,
+      sortable: true,
+      sortValue: (inspection) => inspection.status,
     },
     {
       id: 'progress',
-      header: 'Avance',
-      cell: (order) => <ProgressBar value={order.progress} className="w-28" />,
-    },
-    {
-      id: 'due',
-      header: 'Compromiso',
-      cell: (order) => <span className="text-xs text-muted-foreground">{formatDate(order.dueDate)}</span>,
-      hideOnMobile: true,
-      sortable: true,
-      sortValue: (order) => new Date(order.dueDate),
-    },
-    {
-      id: 'nc',
-      header: 'NC',
-      cell: (order) => (
-        <span className={order.openNonConformities > 0 ? 'font-semibold text-destructive' : 'text-muted-foreground'}>
-          {order.openNonConformities}
-        </span>
+      header: 'Tareas',
+      cell: (inspection) => (
+        <ProgressBar
+          value={inspection.progress}
+          label={`${inspection.completedTasks} de ${inspection.totalTasks}`}
+          className="w-36"
+        />
       ),
       hideOnMobile: true,
+    },
+    {
+      id: 'date',
+      header: 'Creada',
+      cell: (inspection) => <span className="text-xs text-muted-foreground">{formatDate(inspection.createdAt)}</span>,
+      hideOnMobile: true,
+      sortable: true,
+      sortValue: (inspection) => new Date(inspection.createdAt),
     },
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Taller"
+        eyebrow="Servicio de taller"
         title="Panel de taller"
-        description="Expedientes en las diez secciones especializadas: izamiento, mecanizado, balanceo, soldadura, generadores, tratamientos y más."
+        description="Inspecciones, procesos de taller y carga de trabajo por puesto."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/ordenes-servicio">
+                <ClipboardCheck /> Órdenes de servicio
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/taller/inspecciones">
+                <Plus /> Nueva inspección
+              </Link>
+            </Button>
+          </div>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Expedientes de taller" value={orders.length} hint="En secciones especializadas" icon={Factory} tone="accent" />
-        <KpiCard label="En ejecución" value={orders.filter((order) => order.status === 'IN_EXECUTION').length} hint="Trabajo activo" icon={Wrench} tone="info" />
-        <KpiCard label="En calidad" value={orders.filter((order) => order.status === 'IN_QUALITY').length} hint="Pendientes de liberación" icon={Gauge} tone="warning" />
-        <KpiCard label="Listos / entregados" value={orders.filter((order) => ['READY_FOR_DELIVERY', 'DELIVERED', 'CLOSED'].includes(order.status)).length} hint="Cerrados o por entregar" icon={CheckCircle2} tone="success" />
+        <KpiCard label="ODS recibidas" value={orderMetrics.total} hint="Órdenes de Ventas" icon={ClipboardCheck} tone="accent" />
+        <KpiCard label="En inspección" value={inspectionMetrics.inProgress} hint="Tareas en curso" icon={Timer} tone="info" />
+        <KpiCard label="Hojas en ejecución" value={routeMetrics.active} hint="Liberadas a taller" icon={Wrench} tone="warning" />
+        <KpiCard label="Repuestos pendientes" value={sparePending} hint="Por despachar o procurar" icon={Package} tone="success" />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {sections.map((section) => {
-          const active = workload.find((item) => item.areaId === section.areaId)?.value ?? 0;
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {PROCESSES.filter((process) => process.group === 'workshop').map((process) => {
+          const active = workload.find((item) => item.processId === process.id)?.value ?? 0;
           return (
-            <div key={section.areaId} className="rounded-xl border border-border/70 bg-card/70 p-3">
-              <p className="text-xs font-medium text-foreground">{section.name}</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                {active > 0 ? `${active} fase(s) activa(s)` : 'Sin carga activa'}
+            <div key={process.id} className="rounded-xl border border-border/70 bg-card/70 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">{process.name}</p>
+                <span className="size-2 rounded-full" style={{ backgroundColor: process.color }} />
+              </div>
+              <p className="mt-2 text-2xl font-bold text-foreground">{active}</p>
+              <p className="text-xs text-muted-foreground">
+                {active > 0 ? 'tarea(s) activa(s)' : 'Sin carga activa'}
               </p>
             </div>
           );
         })}
       </div>
 
+      {inspectionMetrics.completed > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
+          <CheckCircle2 className="size-5 text-warning" />
+          <p className="flex-1 text-foreground">
+            Hay <strong>{inspectionMetrics.completed}</strong> inspección(es) completada(s) esperando tu aprobación.
+          </p>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/taller/inspecciones">Revisar inspecciones</Link>
+          </Button>
+        </div>
+      )}
+
       <DataTable
-        data={orders}
+        data={inspections}
         columns={columns}
-        getRowId={(order) => order.id}
+        getRowId={(inspection) => inspection.id}
         search={{
-          placeholder: 'Buscar por expediente, activo o alcance…',
-          getText: (order) => `${order.code} ${order.asset?.model ?? ''} ${order.description}`,
+          placeholder: 'Buscar por inspección, ODS, cliente o equipo…',
+          getText: (inspection) =>
+            `${inspection.code} ${inspection.serviceOrder.code} ${inspection.client?.name ?? ''} ${inspection.asset?.model ?? ''}`,
         }}
         actions={[
-          { label: 'Ver expediente', icon: Eye, onSelect: (order) => navigate(`/expedientes/${order.id}`) },
+          {
+            label: 'Ver inspección',
+            icon: Eye,
+            onSelect: (inspection) => navigate(`/taller/inspecciones/${inspection.id}`),
+          },
         ]}
-        onRowClick={(order) => navigate(`/expedientes/${order.id}`)}
+        onRowClick={(inspection) => navigate(`/taller/inspecciones/${inspection.id}`)}
         pageSize={10}
-        emptyTitle="Sin expedientes de taller"
-        emptyDescription="Crea un expediente en modo Taller para comenzar."
-        caption="Expedientes de taller"
+        emptyTitle="Sin inspecciones"
+        emptyDescription="Cuando Taller reciba una ODS podrá crear la primera inspección."
+        caption="Inspecciones del taller"
       />
 
-      <p className="text-xs text-muted-foreground">
-        {metrics.total} expedientes totales · {metrics.openNonConformities} no conformidades abiertas · {metrics.pendingQualityRecords} pruebas pendientes
-      </p>
+      <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-muted/20 p-3 text-xs text-muted-foreground">
+        <Factory className="size-4 shrink-0" />
+        <p>
+          Taller crea la inspección desde la ODS. Los operadores y Calidad ejecutan las tareas; luego Taller aprueba
+          y la inspección pasa a Ingeniería.
+        </p>
+      </div>
     </div>
   );
 }

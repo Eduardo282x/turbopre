@@ -1,84 +1,81 @@
-import { Activity, Clock3, Gauge, Layers } from 'lucide-react';
+import { Activity, CheckCircle2, Clock3, Gauge } from 'lucide-react';
 import { ChartCard } from '@/components/charts/chart-card';
 import { DonutChart } from '@/components/charts/donut-chart';
 import { SimpleBarChart } from '@/components/charts/simple-bar-chart';
-import { PageHeader } from '@/components/common/page-header';
 import { KpiCard } from '@/components/common/kpi-card';
+import { PageHeader } from '@/components/common/page-header';
 import { SectionCard } from '@/components/common/section-card';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
-import { AREAS } from '@/features/preview/config';
+import { PROCESSES } from '@/features/preview/config';
 import {
-  getAreaPerformanceData,
-  getAreaWorkloadData,
   getClientVolumeData,
+  getProcessPerformanceData,
+  getProcessWorkloadData,
   getRouteMetrics,
-  getStatusChartData,
+  getRouteStatusChartData,
 } from '@/features/preview/store/selectors';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 
-interface AreaMetric {
+interface ProcessMetric {
   id: string;
   name: string;
-  activePhases: number;
-  completedPhases: number;
+  activeTasks: number;
+  completedTasks: number;
   averageHours: number;
 }
 
 export function PlantPerformancePage() {
   const db = usePreviewStore((state) => state.db);
-
   const metrics = getRouteMetrics(db);
-  const statusData = getStatusChartData(db);
-  const areaWorkload = getAreaWorkloadData(db);
-  const areaPerformance = getAreaPerformanceData(db);
+  const statusData = getRouteStatusChartData(db);
+  const workload = getProcessWorkloadData(db);
+  const performance = getProcessPerformanceData(db);
   const topClients = getClientVolumeData(db);
 
-  const areaMetrics: AreaMetric[] = AREAS.filter((area) =>
-    ['production', 'engineering', 'support', 'field', 'projects', 'supply'].includes(area.group),
-  ).map((area) => {
-    const performance = areaPerformance.find((item) => item.areaId === area.id);
+  const processMetrics: ProcessMetric[] = PROCESSES.map((process) => {
+    const result = performance.find((item) => item.processId === process.id);
     return {
-      id: area.id,
-      name: area.name,
-      activePhases: db.phases.filter((phase) => phase.areaId === area.id && phase.status !== 'COMPLETED').length,
-      completedPhases: db.phases.filter((phase) => phase.areaId === area.id && phase.status === 'COMPLETED').length,
-      averageHours: performance?.hours ?? 0,
+      id: process.id,
+      name: process.name,
+      activeTasks: workload.find((item) => item.processId === process.id)?.value ?? 0,
+      completedTasks: result?.completed ?? 0,
+      averageHours: result?.hours ?? 0,
     };
   });
 
-  const columns: DataTableColumn<AreaMetric>[] = [
+  const columns: DataTableColumn<ProcessMetric>[] = [
     {
-      id: 'area',
-      header: 'Área',
-      cell: (area) => <span className="font-medium text-foreground">{area.name}</span>,
+      id: 'process',
+      header: 'Proceso',
+      cell: (process) => <span className="font-medium text-foreground">{process.name}</span>,
       sortable: true,
-      sortValue: (area) => area.name,
+      sortValue: (process) => process.name,
     },
     {
       id: 'active',
-      header: 'Fases activas',
-      cell: (area) => <span className="font-mono text-sm">{area.activePhases}</span>,
+      header: 'Tareas activas',
+      cell: (process) => <span className="font-mono text-sm">{process.activeTasks}</span>,
       sortable: true,
-      sortValue: (area) => area.activePhases,
+      sortValue: (process) => process.activeTasks,
     },
     {
       id: 'completed',
       header: 'Completadas',
-      cell: (area) => <span className="font-mono text-sm">{area.completedPhases}</span>,
+      cell: (process) => <span className="font-mono text-sm">{process.completedTasks}</span>,
       sortable: true,
-      sortValue: (area) => area.completedPhases,
+      sortValue: (process) => process.completedTasks,
     },
     {
       id: 'hours',
       header: 'Horas promedio',
-      cell: (area) => (
-        <span className={area.averageHours > 4 ? 'text-warning' : 'text-success'}>
-          {area.averageHours > 0 ? `${area.averageHours} h` : 'Sin datos'}
+      cell: (process) => (
+        <span className={process.averageHours > 4 ? 'text-warning' : 'text-success'}>
+          {process.averageHours > 0 ? `${process.averageHours} h` : 'Sin datos'}
         </span>
       ),
       sortable: true,
-      sortValue: (area) => area.averageHours,
+      sortValue: (process) => process.averageHours,
     },
   ];
 
@@ -87,25 +84,29 @@ export function PlantPerformancePage() {
       <PageHeader
         eyebrow="Análisis"
         title="Rendimiento de planta"
-        description="Tiempos por área, carga de trabajo y distribución de las hojas de ruta."
+        description="Carga de trabajo y tiempos por proceso. Las tareas se agrupan por etapa y puesto."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Hojas totales" value={metrics.total} hint="Expedientes registrados" icon={Layers} tone="accent" />
-        <KpiCard label="Activas" value={metrics.active} hint="En proceso o calidad" icon={Activity} tone="info" />
-        <KpiCard label="Fases completadas" value={metrics.completedPhases} hint={`de ${metrics.totalPhases} fases`} icon={Gauge} tone="success" />
-        <KpiCard label="En calidad" value={metrics.inQuality} hint="Pendientes de liberación" icon={Clock3} tone="warning" />
+        <KpiCard label="Hojas totales" value={metrics.total} hint="Hojas registradas" icon={Gauge} tone="accent" />
+        <KpiCard label="Activas" value={metrics.active} hint="Aprobadas, en taller o calidad" icon={Activity} tone="info" />
+        <KpiCard label="Tareas completadas" value={metrics.completedTasks} hint={`de ${metrics.totalTasks} tareas`} icon={CheckCircle2} tone="success" />
+        <KpiCard label="En calidad" value={metrics.inQuality} hint="Pendientes de visto bueno" icon={Clock3} tone="warning" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Horas promedio por área" description="Duración media de las fases completadas.">
-          <SimpleBarChart data={areaPerformance.map((item) => ({ name: item.name, value: item.hours, color: item.color }))} height={300} valueLabel="Horas" />
+        <ChartCard title="Horas promedio por proceso" description="Duración media de las tareas completadas.">
+          <SimpleBarChart
+            data={performance.map((item) => ({ name: item.name, value: item.hours, color: item.color }))}
+            height={300}
+            valueLabel="Horas"
+          />
         </ChartCard>
-        <ChartCard title="Carga por área" description="Fases pendientes o en proceso.">
+        <ChartCard title="Carga por proceso" description="Tareas pendientes o en proceso.">
           <DonutChart
-            data={areaWorkload}
-            centerValue={areaWorkload.reduce((sum, item) => sum + item.value, 0)}
-            centerLabel="fases activas"
+            data={workload}
+            centerValue={workload.reduce((sum, item) => sum + item.value, 0)}
+            centerLabel="tareas activas"
             height={300}
           />
         </ChartCard>
@@ -115,21 +116,21 @@ export function PlantPerformancePage() {
         <ChartCard title="Flujo de hojas de ruta" description="Distribución por estado.">
           <SimpleBarChart data={statusData} height={280} valueLabel="Hojas" />
         </ChartCard>
-        <ChartCard title="Volumen por cliente" description="Hojas de ruta por empresa.">
-          <SimpleBarChart data={topClients} horizontal height={280} valueLabel="Hojas" />
+        <ChartCard title="Volumen por cliente" description="Órdenes de servicio por empresa.">
+          <SimpleBarChart data={topClients} horizontal height={280} valueLabel="ODS" />
         </ChartCard>
       </div>
 
-      <SectionCard title="Detalle por área" description="Indicadores operativos de cada área." contentClassName="p-0">
+      <SectionCard title="Detalle por proceso" description="Indicadores operativos de cada proceso." contentClassName="p-0">
         <DataTable
-          data={areaMetrics}
+          data={processMetrics}
           columns={columns}
-          getRowId={(area) => area.id}
-          search={{ placeholder: 'Buscar área…', getText: (area) => area.name }}
+          getRowId={(process) => process.id}
+          search={{ placeholder: 'Buscar proceso…', getText: (process) => process.name }}
           pageSize={10}
-          emptyTitle="Sin datos por área"
-          emptyDescription="Las métricas aparecerán cuando existan fases registradas."
-          caption="Indicadores por área"
+          emptyTitle="Sin datos por proceso"
+          emptyDescription="Las métricas aparecerán cuando existan tareas registradas."
+          caption="Indicadores por proceso"
         />
       </SectionCard>
     </div>

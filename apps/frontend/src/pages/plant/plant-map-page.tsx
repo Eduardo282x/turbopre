@@ -7,10 +7,9 @@ import { EmptyState } from '@/components/common/empty-state';
 import { PageHeader } from '@/components/common/page-header';
 import { SectionCard } from '@/components/common/section-card';
 import { Badge } from '@/components/ui/badge';
-import { AREA_BY_ID } from '@/features/preview/config';
-import { getRoutesWithRelations } from '@/features/preview/store/selectors';
+import { getRouteSheetsWithRelations } from '@/features/preview/store/selectors';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { AreaId, RouteSheetWithRelations } from '@/features/preview/types';
+import type { ProcessId, RouteSheetWithRelations } from '@/features/preview/types';
 import { daysUntil } from '@/lib/formatters';
 
 interface Zone {
@@ -19,25 +18,26 @@ interface Zone {
   top: string;
   left: string;
   color: string;
-  areas: AreaId[];
+  processes: ProcessId[];
 }
 
 const ZONES: Zone[] = [
-  { id: 'generators', name: 'Generadores', top: '28%', left: '58%', color: '#eab308', areas: ['generators', 'generator_shop', 'field_generator'] },
-  { id: 'turbines', name: 'Turbinas', top: '33%', left: '23%', color: '#f97316', areas: ['turbines', 'assembly', 'field_gas', 'field_steam'] },
-  { id: 'machining', name: 'Mecanizado / Balanceo', top: '45%', left: '34%', color: '#3b82f6', areas: ['machining', 'machining_major', 'machining_minor', 'balancing', 'thermal_coatings'] },
-  { id: 'welding', name: 'Soldadura', top: '45%', left: '50%', color: '#22c55e', areas: ['welding', 'special_welding'] },
-  { id: 'quality', name: 'Calidad / Ingeniería', top: '62%', left: '23%', color: '#ec4899', areas: ['quality', 'engineering', 'planning', 'metrology', 'field_engineering', 'projects'] },
-  { id: 'workshop', name: 'Taller / Suministro', top: '55%', left: '62%', color: '#14b8a6', areas: ['workshop', 'supply'] },
-  { id: 'warehouse', name: 'Almacén', top: '22%', left: '75%', color: '#ef4444', areas: ['warehouse', 'material_warehouse'] },
+  { id: 'rotating', name: 'Equipos Rotativos', top: '30%', left: '24%', color: '#f97316', processes: ['rotating'] },
+  { id: 'machining', name: 'Mecanizado', top: '45%', left: '38%', color: '#3b82f6', processes: ['machining'] },
+  { id: 'welding', name: 'Soldadura', top: '46%', left: '54%', color: '#22c55e', processes: ['welding'] },
+  { id: 'generators', name: 'Generadores', top: '28%', left: '62%', color: '#eab308', processes: ['generators'] },
+  { id: 'quality', name: 'Calidad / Ingeniería', top: '64%', left: '30%', color: '#ec4899', processes: ['quality', 'engineering'] },
+  { id: 'warehouse', name: 'Almacén', top: '22%', left: '78%', color: '#14b8a6', processes: [] },
 ];
 
 function routeZone(route: RouteSheetWithRelations): Zone | undefined {
-  const currentPhase =
-    route.phases.find((phase) => phase.status === 'IN_PROGRESS') ??
-    route.phases.find((phase) => phase.status === 'PENDING');
-  if (!currentPhase) return undefined;
-  return ZONES.find((zone) => zone.areas.includes(currentPhase.areaId));
+  if (route.activeProcess) {
+    return ZONES.find((zone) => zone.processes.includes(route.activeProcess!.id));
+  }
+  if (['IN_ANNEXES', 'IN_QUALITY'].includes(route.status)) {
+    return ZONES.find((zone) => zone.id === 'quality');
+  }
+  return undefined;
 }
 
 function alertColor(route: RouteSheetWithRelations): string {
@@ -51,8 +51,8 @@ export function PlantMapPage() {
   const db = usePreviewStore((state) => state.db);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
 
-  const activeRoutes = getRoutesWithRelations(db).filter((route) =>
-    ['APPROVED', 'IN_PROGRESS', 'IN_QUALITY'].includes(route.status),
+  const activeRoutes = getRouteSheetsWithRelations(db).filter((route) =>
+    ['APPROVED', 'IN_PROGRESS', 'IN_ANNEXES', 'IN_QUALITY'].includes(route.status),
   );
 
   const byZone = new Map<string, RouteSheetWithRelations[]>();
@@ -72,12 +72,12 @@ export function PlantMapPage() {
       <PageHeader
         eyebrow="Análisis"
         title="Mapa de planta"
-        description="Ubicación física aproximada de las hojas de ruta activas según el área de su fase actual."
+        description="Ubicación aproximada de las hojas activas según el proceso de su etapa actual."
       />
 
       <SectionCard
         title="Plano general TurboPre"
-        description="Haz clic en un punto para ver los equipos ubicados en esa área."
+        description="Haz clic en un punto para ver las hojas activas en esa zona."
         actions={
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-success" /> Al día</span>
@@ -89,7 +89,7 @@ export function PlantMapPage() {
         <div className="overflow-hidden rounded-xl border border-border bg-[#070b10]">
           <div className="relative w-full">
             <img src={plano} alt="Plano de la planta TurboPre" className="w-full opacity-90" />
-            {ZONES.map((zone) => {
+            {ZONES.filter((zone) => zone.processes.length > 0).map((zone) => {
               const routes = byZone.get(zone.id) ?? [];
               if (routes.length === 0) return null;
               const critical = routes.some((route) => alertColor(route) === '#ff4d5e');
@@ -121,22 +121,19 @@ export function PlantMapPage() {
       </SectionCard>
 
       <SectionCard
-        title={selectedZoneInfo ? selectedZoneInfo.name : 'Equipos en planta'}
+        title={selectedZoneInfo ? selectedZoneInfo.name : 'Hojas en planta'}
         description={
           selectedZoneInfo
-            ? `${selectedRoutes.length} hoja(s) de ruta en esta área.`
-            : 'Selecciona un punto del plano para filtrar los equipos.'
+            ? `${selectedRoutes.length} hoja(s) de ruta en esta zona.`
+            : 'Selecciona un punto del plano para filtrar las hojas.'
         }
       >
         {selectedZone ? (
           selectedRoutes.length === 0 ? (
-            <EmptyState icon={MapPin} title="Sin equipos en esta área" description="No hay hojas activas ubicadas aquí." />
+            <EmptyState icon={MapPin} title="Sin hojas en esta zona" description="No hay hojas activas ubicadas aquí." />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {selectedRoutes.map((route) => {
-                const currentPhase =
-                  route.phases.find((phase) => phase.status === 'IN_PROGRESS') ??
-                  route.phases.find((phase) => phase.status === 'PENDING');
                 const color = alertColor(route);
                 return (
                   <Link
@@ -147,15 +144,17 @@ export function PlantMapPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground">{route.code}</p>
-                        <p className="truncate text-xs text-muted-foreground">{route.component.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {route.asset?.manufacturer} {route.asset?.model}
+                        </p>
                       </div>
                       <RouteStatusBadge status={route.status} />
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Fase: {currentPhase?.name ?? 'Sin fase activa'}
+                      Proceso: {route.activeProcess?.name ?? 'Sin proceso activo'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Área: {currentPhase ? AREA_BY_ID[currentPhase.areaId].shortName : '—'}
+                      Etapa {route.currentStage ?? '—'} · {route.progress}% de avance
                     </p>
                     {color === '#ff4d5e' && (
                       <Badge variant="destructive" className="mt-2 gap-1 text-[10px]">
@@ -169,7 +168,7 @@ export function PlantMapPage() {
           )
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {ZONES.map((zone) => (
+            {ZONES.filter((zone) => zone.processes.length > 0).map((zone) => (
               <button
                 key={zone.id}
                 type="button"
