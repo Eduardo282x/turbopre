@@ -13,8 +13,10 @@
 .vscode
 .idea
 
-# Backend is not part of the frontend image
-apps/backend
+# Prisma client and incremental build metadata. Both are regenerated inside the
+# image, and the local copies must not leak into the build context.
+apps/backend/src/generated
+**/*.tsbuildinfo
 
 # Mockup reference is not needed at build time
 apps/frontend/reference
@@ -22,6 +24,7 @@ apps/frontend/reference
 # Documentation, local environment and logs
 docs
 *.md
-.env
-.env.*
+**/.env
+**/.env.*
+!**/.env.example
 *.log
