@@ -16,7 +16,6 @@ import { DEMO_PASSWORD } from '@/features/preview/data/seed';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { getInitials } from '@/lib/formatters';
-import { isPreviewMode } from '@/lib/preview';
 import { authService } from '@/services/auth/auth.service';
 import { useAuthStore } from '@/stores/use-auth-store';
 import { loginSchema, type LoginInput } from '@turbopre/shared';
@@ -89,11 +88,9 @@ export function LoginPage() {
     >
       <div className="absolute inset-0 bg-[#0a0e14]/70 backdrop-blur-[3px]" aria-hidden="true" />
 
-      <div className={`relative z-10 w-full ${isPreviewMode ? 'max-w-5xl' : 'max-w-xl'}`}>
+      <div className={`relative z-10 w-full max-w-xl`}>
         <div
-          className={`grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl ${
-            isPreviewMode ? 'lg:grid-cols-[1.05fr_0.95fr]' : ''
-          }`}
+          className={`grid overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/55 shadow-2xl backdrop-blur-xl`}
         >
           <section className="flex flex-col justify-between gap-8 p-7 sm:p-10">
             <div className="space-y-5">
@@ -192,62 +189,8 @@ export function LoginPage() {
                 <LogIn /> {submitting ? 'Ingresando…' : 'Iniciar sesión'}
               </Button>
 
-              {isPreviewMode ? (
-                <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-                  <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
-                  Modo demo/QA. Contraseña de los usuarios de prueba:{' '}
-                  <span className="font-mono text-zinc-200">{DEMO_PASSWORD}</span>. En producción no se muestran
-                  accesos rápidos.
-                </p>
-              ) : (
-                <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
-                  <ShieldCheck className="mr-1 inline size-3.5 text-cyan-300" />
-                  El acceso es creado por el administrador del sistema. No hay auto-registro.
-                </p>
-              )}
             </form>
           </section>
-
-          {isPreviewMode && (
-            <section className="border-t border-white/10 bg-black/20 p-6 lg:border-t-0 lg:border-l sm:p-8">
-              <div className="mb-4 space-y-1">
-                <p className="font-heading text-sm font-semibold text-white">Acceso rápido de QA</p>
-                <p className="text-xs text-zinc-400">
-                  Solo visible en desarrollo. Inicia sesión real con cada rol para revisar la navegación y permisos.
-                </p>
-              </div>
-              <ScrollArea className="h-[460px] pr-3">
-                <div className="space-y-5">
-                  {grouped.map(({ role, users: roleUsers }) => (
-                    <div key={role.id}>
-                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-                        {ROLE_BY_ID[role.id].label}
-                      </p>
-                      <div className="space-y-1">
-                        {roleUsers.map((user) => (
-                          <button
-                            key={user.id}
-                            type="button"
-                            disabled={submitting}
-                            onClick={() => enterAs(user.username)}
-                            className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none disabled:opacity-60"
-                          >
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
-                              {getInitials(user.name)}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-zinc-100">{user.name}</span>
-                              <span className="block truncate text-[11px] text-zinc-400">{getRoleDisplay(user)}</span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </section>
-          )}
         </div>
 
         <p className="mt-5 text-center text-[11px] text-white/45">
