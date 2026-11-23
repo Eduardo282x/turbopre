@@ -66,18 +66,9 @@ export function LoginPage() {
     }
   };
 
-  const enterAs = (username: string) => {
-    void handleLogin(username, DEMO_PASSWORD);
-  };
-
   const onSubmit = form.handleSubmit((values) => {
     void handleLogin(values.username.trim(), values.password);
   });
-
-  const grouped = ROLE_OPTIONS.map((role) => ({
-    role,
-    users: users.filter((user) => user.role === role.id),
-  })).filter((group) => group.users.length > 0);
 
   return (
     <div
