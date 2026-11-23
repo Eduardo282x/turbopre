@@ -1,0 +1,817 @@
+// ============================================================
+// CAMI · TurboPre Services
+// Modelo de datos en español para dbdiagram.io (DBML)
+// ============================================================
+// Este archivo es una traducción de documentación del esquema Prisma.
+// No es el esquema ejecutable: los nombres de tablas, columnas y valores
+// de enums están en español para facilitar la lectura del negocio.
+// La fuente de verdad sigue siendo apps/backend/prisma/schema.prisma.
+// Pegar el contenido completo en https://dbdiagram.io
+// ============================================================
+
+Project CAMI_TurboPre {
+  database_type: 'PostgreSQL'
+  Note: 'Control Automatizado de Mantenimiento Industrial · TurboPre Services'
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+// Prisma: UserRole · ADMIN, SALES, WORKSHOP, OPERATOR, ENGINEER, QUALITY,
+// PROJECT_MANAGER, WAREHOUSE
+Enum rol_usuario {
+  ADMINISTRADOR
+  VENTAS
+  TALLER
+  OPERADOR
+  INGENIERIA
+  CALIDAD
+  GERENTE_PROYECTO
+  ALMACEN
+}
+
+// Prisma: ProcessKind · WORKSHOP, ENGINEERING, QUALITY, SUPPORT
+Enum tipo_proceso {
+  TALLER
+  INGENIERIA
+  CALIDAD
+  APOYO
+}
+
+// Prisma: Priority · LOW, MEDIUM, HIGH, CRITICAL
+Enum prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+// Prisma: ServiceOrderStatus · OPEN, IN_PROGRESS, READY_FOR_DELIVERY,
+// DELIVERED, CLOSED, CANCELLED
+Enum estado_orden_servicio {
+  ABIERTA
+  EN_PROGRESO
+  LISTA_PARA_ENTREGA
+  ENTREGADA
+  CERRADA
+  CANCELADA
+}
+
+// Prisma: InspectionStatus · OPEN, IN_PROGRESS, COMPLETED, APPROVED,
+// REJECTED, CANCELLED
+Enum estado_inspeccion {
+  ABIERTA
+  EN_PROGRESO
+  COMPLETADA
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
+
+// Prisma: RouteSheetStatus · DRAFT, PENDING_APPROVAL, RELEASED,
+// IN_PROGRESS, PENDING_ANNEX_REVIEW, PENDING_QUALITY_APPROVAL,
+// COMPLETED, CANCELLED
+Enum estado_hoja_ruta {
+  BORRADOR
+  PENDIENTE_APROBACION
+  LIBERADA
+  EN_PROGRESO
+  PENDIENTE_REVISION_ANEXOS
+  PENDIENTE_APROBACION_CALIDAD
+  COMPLETADA
+  CANCELADA
+}
+
+// Prisma: TaskStatus · PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+// "BLOQUEADA" no se almacena: se calcula con la etapa y la secuencia.
+Enum estado_tarea {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADA
+  CANCELADA
+}
+
+// Prisma: TaskSource · INSPECTION, ROUTE_SHEET
+Enum origen_tarea {
+  INSPECCION
+  HOJA_RUTA
+}
+
+// Prisma: ReviewStage · MANAGER_APPROVAL, ANNEX_REVIEW, QUALITY_APPROVAL
+Enum etapa_revision {
+  APROBACION_GERENCIA
+  REVISION_ANEXOS
+  APROBACION_CALIDAD
+}
+
+// Prisma: ReviewDecision · APPROVED, REJECTED, CHANGES_REQUESTED
+Enum decision_revision {
+  APROBADA
+  RECHAZADA
+  CAMBIOS_SOLICITADOS
+}
+
+// Prisma: AttachmentType · PHOTO, PDF, PLAN, CERTIFICATE, OTHER
+Enum tipo_adjunto {
+  FOTO
+  PDF
+  PLANO
+  CERTIFICADO
+  OTRO
+}
+
+// Prisma: ItemType · SPARE_PART, CONSUMABLE, TOOL, EQUIPMENT
+Enum tipo_articulo {
+  REPUESTO
+  CONSUMIBLE
+  HERRAMIENTA
+  EQUIPO
+}
+
+// Prisma: InventoryUnitStatus · AVAILABLE, LOANED, IN_USE, MAINTENANCE, RETIRED
+Enum estado_unidad_inventario {
+  DISPONIBLE
+  PRESTADO
+  EN_USO
+  MANTENIMIENTO
+  RETIRADO
+}
+
+// Prisma: StockMovementType · IN, OUT, ADJUSTMENT, RETURN
+Enum tipo_movimiento_stock {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  DEVOLUCION
+}
+
+// Prisma: MaterialRequestStatus · PENDING, PARTIALLY_FULFILLED,
+// FULFILLED, CANCELLED
+Enum estado_solicitud_material {
+  PENDIENTE
+  PARCIALMENTE_CUMPLIDA
+  CUMPLIDA
+  CANCELADA
+}
+
+// Prisma: MaterialRequestItemStatus · PENDING, IN_STOCK, PURCHASE_REQUIRED,
+// PURCHASED, DELIVERED, REJECTED
+Enum estado_item_solicitud {
+  PENDIENTE
+  EN_STOCK
+  REQUIERE_COMPRA
+  COMPRADO
+  ENTREGADO
+  RECHAZADO
+}
+
+// Prisma: LoanStatus · ACTIVE, PARTIALLY_RETURNED, RETURNED, CANCELLED
+Enum estado_prestamo {
+  ACTIVO
+  PARCIALMENTE_DEVUELTO
+  DEVUELTO
+  CANCELADO
+}
+
+// Prisma: CalibrationResult · PASSED, FAILED, CONDITIONAL
+Enum resultado_calibracion {
+  APROBADA
+  FALLIDA
+  CONDICIONAL
+}
+
+// Prisma: ProjectStatus · PLANNED, ACTIVE, ON_HOLD, COMPLETED, CANCELLED
+Enum estado_proyecto {
+  PLANIFICADO
+  ACTIVO
+  EN_ESPERA
+  COMPLETADO
+  CANCELADO
+}
+
+// Prisma: AuditAction · CREATE, UPDATE, DELETE, APPROVE, REJECT,
+// COMPLETE, DELIVER, LOGIN, STATUS_CHANGE
+Enum accion_auditoria {
+  CREAR
+  ACTUALIZAR
+  ELIMINAR
+  APROBAR
+  RECHAZAR
+  COMPLETAR
+  ENTREGAR
+  INICIAR_SESION
+  CAMBIO_ESTADO
+}
+
+// Prisma: AiSuggestionStatus · DRAFT, ACCEPTED, REJECTED
+Enum estado_sugerencia_ia {
+  BORRADOR
+  ACEPTADA
+  RECHAZADA
+}
+
+// ============================================================
+// ORGANIZACIÓN Y ACCESO
+// ============================================================
+
+Table departamentos {
+  id varchar [pk, note: 'ID único']
+  codigo varchar [unique, not null]
+  nombre varchar [not null]
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  Note: 'Prisma: Department · Áreas de la empresa'
+}
+
+Table procesos {
+  id varchar [pk]
+  departamento_id varchar [not null, ref: > departamentos.id]
+  codigo varchar [unique, not null]
+  nombre varchar [not null]
+  tipo tipo_proceso [not null, default: 'TALLER']
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    departamento_id
+  }
+
+  Note: 'Prisma: Process · Procesos de taller, ingeniería y calidad'
+}
+
+Table puestos_trabajo {
+  id varchar [pk]
+  proceso_id varchar [not null, ref: > procesos.id]
+  codigo varchar [unique, not null]
+  nombre varchar [not null]
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    proceso_id
+    (proceso_id, nombre) [unique]
+  }
+
+  Note: 'Prisma: JobPosition · Puesto que ejecuta una tarea'
+}
+
+Table usuarios {
+  id varchar [pk]
+  usuario varchar [unique, not null]
+  correo varchar [unique]
+  hash_contrasena varchar [not null]
+  nombre_completo varchar [not null]
+  rol rol_usuario [not null]
+  puesto_trabajo_id varchar [ref: > puestos_trabajo.id]
+  activo boolean [not null, default: true]
+  ultimo_acceso_en timestamp
+  creado_por_id varchar [ref: > usuarios.id]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    puesto_trabajo_id
+    creado_por_id
+    rol
+    activo
+  }
+
+  Note: 'Prisma: User · Usuarios creados por el administrador'
+}
+
+// ============================================================
+// COMERCIAL Y ÓRDENES DE SERVICIO
+// ============================================================
+
+Table clientes {
+  id varchar [pk]
+  codigo varchar [unique]
+  nombre varchar [not null]
+  rif varchar [unique]
+  nombre_contacto varchar
+  correo_contacto varchar
+  telefono_contacto varchar
+  direccion varchar
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  Note: 'Prisma: Client · Cartera comercial'
+}
+
+Table sitios {
+  id varchar [pk]
+  cliente_id varchar [not null, ref: > clientes.id]
+  nombre varchar [not null]
+  direccion varchar
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    cliente_id
+    (cliente_id, nombre) [unique]
+  }
+
+  Note: 'Prisma: Site · Sitio o planta del cliente'
+}
+
+Table equipos {
+  id varchar [pk]
+  cliente_id varchar [not null, ref: > clientes.id]
+  codigo varchar [not null]
+  nombre varchar [not null]
+  numero_serie varchar
+  fabricante varchar
+  modelo varchar
+  tipo varchar
+  notas varchar
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    cliente_id
+    (cliente_id, codigo) [unique]
+  }
+
+  Note: 'Prisma: Equipment · Equipo del cliente; código único por cliente'
+}
+
+Table proyectos {
+  id varchar [pk]
+  codigo varchar [unique, not null]
+  nombre varchar [not null]
+  cliente_id varchar [ref: > clientes.id]
+  gerente_id varchar [ref: > usuarios.id]
+  estado estado_proyecto [not null, default: 'PLANIFICADO']
+  fecha_inicio timestamp
+  fecha_limite timestamp
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    cliente_id
+    gerente_id
+    estado
+  }
+
+  Note: 'Prisma: Project · Agrupación opcional de ODS'
+}
+
+Table ordenes_servicio {
+  id varchar [pk]
+  numero_orden varchar [unique, not null]
+  orden_padre_id varchar [ref: > ordenes_servicio.id]
+  cliente_id varchar [not null, ref: > clientes.id]
+  sitio_id varchar [not null, ref: > sitios.id]
+  equipo_id varchar [not null, ref: > equipos.id]
+  proyecto_id varchar [ref: > proyectos.id]
+  creado_por_id varchar [not null, ref: > usuarios.id]
+  descripcion varchar [not null]
+  alcance varchar [not null]
+  prioridad prioridad [not null, default: 'MEDIA']
+  estado estado_orden_servicio [not null, default: 'ABIERTA']
+  solicitada_en timestamp [not null, default: `now()`]
+  fecha_limite timestamp
+  entregada_en timestamp
+  cerrada_en timestamp
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    cliente_id
+    sitio_id
+    equipo_id
+    proyecto_id
+    creado_por_id
+    estado
+    fecha_limite
+    orden_padre_id
+  }
+
+  Note: 'Prisma: ServiceOrder · ODS. Los retrabajos se cuelgan de orden_padre_id'
+}
+
+// ============================================================
+// INSPECCIÓN Y EJECUCIÓN
+// ============================================================
+
+Table inspecciones {
+  id varchar [pk]
+  codigo varchar [unique, not null]
+  orden_servicio_id varchar [not null, ref: > ordenes_servicio.id]
+  creado_por_id varchar [not null, ref: > usuarios.id]
+  detalles_tecnicos varchar
+  estado estado_inspeccion [not null, default: 'ABIERTA']
+  aprobado_por_id varchar [ref: > usuarios.id]
+  aprobada_en timestamp
+  motivo_rechazo varchar
+  iniciada_en timestamp
+  completada_en timestamp
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    orden_servicio_id
+    creado_por_id
+    aprobado_por_id
+    estado
+  }
+
+  Note: 'Prisma: Inspection · Inspección creada por Taller desde una ODS'
+}
+
+Table tareas {
+  id varchar [pk]
+  inspeccion_id varchar [ref: > inspecciones.id]
+  hoja_ruta_id varchar [ref: > hojas_ruta.id]
+  puesto_trabajo_id varchar [not null, ref: > puestos_trabajo.id]
+  asignada_a_id varchar [ref: > usuarios.id]
+  creado_por_id varchar [not null, ref: > usuarios.id]
+  secuencia integer
+  etapa integer [not null, default: 1]
+  origen origen_tarea [not null, default: 'HOJA_RUTA']
+  descripcion varchar [not null]
+  criterio varchar
+  referencia_formulario varchar
+  estado estado_tarea [not null, default: 'PENDIENTE']
+  requiere_evidencia boolean [not null, default: true]
+  minutos_estimados integer
+  iniciada_en timestamp
+  completada_en timestamp
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    inspeccion_id
+    (hoja_ruta_id, etapa, secuencia)
+    puesto_trabajo_id
+    asignada_a_id
+    estado
+  }
+
+  Note: 'Prisma: Task · Una tarea de inspección puede promoverse a la hoja conservando ambos IDs'
+}
+
+Table evidencias_tarea {
+  id varchar [pk]
+  tarea_id varchar [not null, ref: > tareas.id]
+  url varchar [not null]
+  tipo tipo_adjunto [not null, default: 'FOTO']
+  subido_por_id varchar [not null, ref: > usuarios.id]
+  seleccionada_para_anexo boolean
+  revisado_por_id varchar [ref: > usuarios.id]
+  revisado_en timestamp
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    tarea_id
+    subido_por_id
+    revisado_por_id
+  }
+
+  Note: 'Prisma: TaskAttachment · Evidencia de una tarea; null = sin revisar'
+}
+
+// ============================================================
+// HOJA DE RUTA Y APROBACIONES
+// ============================================================
+
+Table hojas_ruta {
+  id varchar [pk]
+  codigo varchar [unique, not null]
+  orden_servicio_id varchar [unique, not null, ref: > ordenes_servicio.id]
+  inspeccion_id varchar [ref: > inspecciones.id]
+  creado_por_id varchar [not null, ref: > usuarios.id]
+  estado estado_hoja_ruta [not null, default: 'BORRADOR']
+  ubicacion_actual_id varchar [ref: > ubicaciones_planta.id]
+  liberada_en timestamp
+  completada_en timestamp
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    creado_por_id
+    inspeccion_id
+    estado
+    ubicacion_actual_id
+  }
+
+  Note: 'Prisma: RouteSheet · Una ODS tiene una sola hoja de ruta activa'
+}
+
+Table revisiones_hoja_ruta {
+  id varchar [pk]
+  hoja_ruta_id varchar [not null, ref: > hojas_ruta.id]
+  etapa etapa_revision [not null]
+  revisor_id varchar [not null, ref: > usuarios.id]
+  decision decision_revision [not null]
+  comentarios varchar
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    (hoja_ruta_id, etapa)
+    revisor_id
+  }
+
+  Note: 'Prisma: RouteSheetReview · Historial de aprobaciones y rechazos'
+}
+
+Table documentos_hoja_ruta {
+  id varchar [pk]
+  hoja_ruta_id varchar [not null, ref: > hojas_ruta.id]
+  url varchar [not null]
+  tipo tipo_adjunto [not null, default: 'PDF']
+  subido_por_id varchar [not null, ref: > usuarios.id]
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    hoja_ruta_id
+    subido_por_id
+  }
+
+  Note: 'Prisma: RouteSheetDocument · Planos, procedimientos y anexos'
+}
+
+// ============================================================
+// MAPA DE PLANTA
+// ============================================================
+
+Table ubicaciones_planta {
+  id varchar [pk]
+  codigo varchar [unique, not null]
+  nombre varchar [not null]
+  proceso_id varchar [ref: > procesos.id]
+  mapa_x float
+  mapa_y float
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    proceso_id
+  }
+
+  Note: 'Prisma: PlantLocation · Ubicación física del taller'
+}
+
+Table historial_ubicacion_hoja {
+  id varchar [pk]
+  hoja_ruta_id varchar [not null, ref: > hojas_ruta.id]
+  ubicacion_id varchar [not null, ref: > ubicaciones_planta.id]
+  movido_por_id varchar [not null, ref: > usuarios.id]
+  movido_en timestamp [not null, default: `now()`]
+  notas varchar
+
+  indexes {
+    hoja_ruta_id
+    ubicacion_id
+    movido_por_id
+  }
+
+  Note: 'Prisma: RouteSheetLocationHistory · Trazabilidad de movimientos'
+}
+
+// ============================================================
+// ALMACÉN, INVENTARIO Y PRÉSTAMOS
+// ============================================================
+
+Table categorias_inventario {
+  id varchar [pk]
+  nombre varchar [unique, not null]
+  descripcion varchar
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  Note: 'Prisma: ItemCategory · Categorías del almacén'
+}
+
+Table articulos_inventario {
+  id varchar [pk]
+  sku varchar [unique, not null]
+  nombre varchar [not null]
+  categoria_id varchar [not null, ref: > categorias_inventario.id]
+  tipo_articulo tipo_articulo [not null, default: 'REPUESTO']
+  unidad varchar [not null, default: 'UND']
+  cantidad_stock integer [not null, default: 0]
+  stock_minimo integer [not null, default: 0]
+  rastrea_serie boolean [not null, default: false]
+  requiere_calibracion boolean [not null, default: false]
+  prestable boolean [not null, default: false]
+  ubicacion_almacen varchar
+  notas varchar
+  activo boolean [not null, default: true]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    categoria_id
+    tipo_articulo
+    activo
+  }
+
+  Note: 'Prisma: InventoryItem · Repuesto, consumible, herramienta o equipo'
+}
+
+Table unidades_inventario {
+  id varchar [pk]
+  articulo_inventario_id varchar [not null, ref: > articulos_inventario.id]
+  numero_serie varchar [unique, not null]
+  estado estado_unidad_inventario [not null, default: 'DISPONIBLE']
+  calibracion_vencida_en timestamp
+  ubicacion_almacen varchar
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    articulo_inventario_id
+    estado
+    calibracion_vencida_en
+  }
+
+  Note: 'Prisma: InventoryUnit · Unidad serializada de un artículo'
+}
+
+Table movimientos_stock {
+  id varchar [pk]
+  articulo_inventario_id varchar [not null, ref: > articulos_inventario.id]
+  tipo tipo_movimiento_stock [not null]
+  cantidad integer [not null]
+  motivo varchar
+  tipo_referencia varchar
+  referencia_id varchar
+  realizado_por_id varchar [not null, ref: > usuarios.id]
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    articulo_inventario_id
+    realizado_por_id
+    creado_en
+  }
+
+  Note: 'Prisma: StockMovement · Entradas, salidas, ajustes y devoluciones'
+}
+
+Table solicitudes_material {
+  id varchar [pk]
+  numero_solicitud varchar [unique, not null]
+  orden_servicio_id varchar [not null, ref: > ordenes_servicio.id]
+  hoja_ruta_id varchar [ref: > hojas_ruta.id]
+  solicitado_por_id varchar [not null, ref: > usuarios.id]
+  estado estado_solicitud_material [not null, default: 'PENDIENTE']
+  notas varchar
+  entregada_en timestamp
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    orden_servicio_id
+    hoja_ruta_id
+    solicitado_por_id
+    estado
+  }
+
+  Note: 'Prisma: MaterialRequest · Solicitud de repuestos o materiales'
+}
+
+Table items_solicitud_material {
+  id varchar [pk]
+  solicitud_material_id varchar [not null, ref: > solicitudes_material.id]
+  articulo_inventario_id varchar [ref: > articulos_inventario.id]
+  descripcion varchar
+  cantidad integer [not null, default: 1]
+  unidad varchar
+  estado estado_item_solicitud [not null, default: 'PENDIENTE']
+  notas_compra varchar
+  entregada_en timestamp
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    solicitud_material_id
+    articulo_inventario_id
+    estado
+  }
+
+  Note: 'Prisma: MaterialRequestItem · Línea de solicitud; stock o compra'
+}
+
+Table prestamos {
+  id varchar [pk]
+  numero_prestamo varchar [unique, not null]
+  recibido_por_id varchar [not null, ref: > usuarios.id]
+  autorizado_por_id varchar [not null, ref: > usuarios.id]
+  orden_servicio_id varchar [ref: > ordenes_servicio.id]
+  estado estado_prestamo [not null, default: 'ACTIVO']
+  prestado_en timestamp [not null, default: `now()`]
+  fecha_limite timestamp
+  devuelto_en timestamp
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    recibido_por_id
+    autorizado_por_id
+    orden_servicio_id
+    estado
+  }
+
+  Note: 'Prisma: Loan · Préstamo de equipamiento'
+}
+
+Table items_prestamo {
+  id varchar [pk]
+  prestamo_id varchar [not null, ref: > prestamos.id]
+  articulo_inventario_id varchar [ref: > articulos_inventario.id]
+  unidad_inventario_id varchar [ref: > unidades_inventario.id]
+  cantidad integer [not null, default: 1]
+  cantidad_devuelta integer [not null, default: 0]
+  condicion_devolucion varchar
+  notas varchar
+
+  indexes {
+    prestamo_id
+    articulo_inventario_id
+    unidad_inventario_id
+  }
+
+  Note: 'Prisma: LoanItem · Consumible o unidad serializada prestada'
+}
+
+Table calibraciones {
+  id varchar [pk]
+  unidad_inventario_id varchar [not null, ref: > unidades_inventario.id]
+  realizada_en timestamp [not null, default: `now()`]
+  proximo_vencimiento_en timestamp
+  resultado resultado_calibracion [not null]
+  url_certificado varchar
+  realizada_por_id varchar [not null, ref: > usuarios.id]
+  notas varchar
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    unidad_inventario_id
+    realizada_por_id
+    proximo_vencimiento_en
+  }
+
+  Note: 'Prisma: Calibration · Calibración de una unidad serializada'
+}
+
+// ============================================================
+// CONTROL, AUDITORÍA E IA
+// ============================================================
+
+Table auditoria {
+  id varchar [pk]
+  usuario_id varchar [ref: > usuarios.id]
+  accion accion_auditoria [not null]
+  entidad varchar [not null]
+  entidad_id varchar [not null]
+  cambios json
+  ip varchar
+  creado_en timestamp [not null, default: `now()`]
+
+  indexes {
+    usuario_id
+    (entidad, entidad_id)
+    creado_en
+  }
+
+  Note: 'Prisma: AuditLog · Registro de solo escritura'
+}
+
+Table sugerencias_ia_hoja_ruta {
+  id varchar [pk]
+  orden_servicio_id varchar [not null, ref: > ordenes_servicio.id]
+  solicitado_por_id varchar [not null, ref: > usuarios.id]
+  prompt varchar [not null]
+  respuesta json [not null]
+  proveedor varchar
+  modelo varchar
+  estado estado_sugerencia_ia [not null, default: 'BORRADOR']
+  aceptado_por_id varchar [ref: > usuarios.id]
+  creado_en timestamp [not null, default: `now()`]
+  actualizado_en timestamp [not null]
+
+  indexes {
+    orden_servicio_id
+    solicitado_por_id
+    aceptado_por_id
+  }
+
+  Note: 'Prisma: AiRouteSheetSuggestion · Borrador de IA revisado por humanos'
+}

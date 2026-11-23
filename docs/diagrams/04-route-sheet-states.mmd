@@ -1,0 +1,29 @@
+%% CAMI · TurboPre Services
+%% Ciclo de vida de la hoja de ruta
+stateDiagram-v2
+    [*] --> BORRADOR
+    BORRADOR --> PENDIENTE_APROBACION: Ingeniería envía
+    PENDIENTE_APROBACION --> BORRADOR: Gerencia rechaza
+    PENDIENTE_APROBACION --> LIBERADA: Gerencia aprueba
+    LIBERADA --> EN_PROGRESO: Primera tarea completada
+    EN_PROGRESO --> PENDIENTE_REVISION_ANEXOS: Todas las tareas completas
+    PENDIENTE_REVISION_ANEXOS --> EN_PROGRESO: Ingeniería devuelve anexos
+    PENDIENTE_REVISION_ANEXOS --> PENDIENTE_APROBACION_CALIDAD: Ingeniería finaliza anexos
+    PENDIENTE_APROBACION_CALIDAD --> EN_PROGRESO: Calidad rechaza
+    PENDIENTE_APROBACION_CALIDAD --> COMPLETADA: Calidad aprueba
+    BORRADOR --> CANCELADA: Cancelación
+    COMPLETADA --> [*]
+    CANCELADA --> [*]
+
+    note right of PENDIENTE_REVISION_ANEXOS
+        Ingeniería selecciona las evidencias
+        que acompañan la hoja. Si agrega una
+        tarea de corrección, la hoja vuelve
+        a EN_PROGRESO y se reabre la última etapa.
+    end note
+
+    note left of COMPLETADA
+        La entrega final se registra en la ODS:
+        COMPLETADA → ODS LISTA_PARA_ENTREGA
+        → ODS ENTREGADA.
+    end note

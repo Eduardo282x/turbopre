@@ -1,0 +1,27 @@
+%% CAMI · TurboPre Services
+%% Ejecución de tareas y cálculo de bloqueos por etapa
+flowchart TD
+    A["Ingeniería define la tarea<br/>etapa + puesto + secuencia"] --> B["Tarea en estado PENDIENTE"]
+    B --> C{"¿La etapa anterior está completa?"}
+    C -->|No| D["Tarea BLOQUEADA<br/>(se calcula, no se guarda)"]
+    D --> E["Esperar a que se complete la etapa anterior"]
+    E --> C
+    C -->|Sí| F["Tarea disponible para ejecución"]
+    F --> G{"¿La hoja está LIBERADA<br/>o EN_PROGRESO?"}
+    G -->|No| H["No se puede ejecutar todavía"]
+    G -->|Sí| I{"¿El usuario es el asignado<br/>o pertenece al puesto?"}
+    I -->|No| J["La API rechaza la operación"]
+    I -->|Sí| K{"¿La tarea requiere evidencia?"}
+    K -->|Sí| L["Adjuntar foto o archivo"]
+    K -->|No| M["Registrar observaciones"]
+    L --> M
+    M --> N["Marcar tarea COMPLETADA"]
+    N --> O{"¿Quedan tareas pendientes<br/>en la misma etapa?"}
+    O -->|Sí| P["La etapa sigue activa"]
+    P --> Q["Las demás tareas de la etapa<br/>pueden ejecutarse en paralelo"]
+    Q --> B
+    O -->|No| R["Se desbloquea la siguiente etapa"]
+    R --> S{"¿Quedan tareas pendientes<br/>en la hoja de ruta?"}
+    S -->|Sí| B
+    S -->|No| T["La hoja pasa a PENDIENTE_REVISION_ANEXOS"]
+    T --> U["Ingeniería y Calidad continúan el flujo"]

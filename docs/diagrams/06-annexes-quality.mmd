@@ -1,0 +1,23 @@
+%% CAMI · TurboPre Services
+%% Revisión de anexos, visto bueno de Calidad y entrega
+flowchart TD
+    A["Todas las tareas de la hoja están completas"] --> B["Hoja PENDIENTE_REVISION_ANEXOS"]
+    B --> C["Ingeniería revisa las evidencias de cada tarea"]
+    C --> D["Selecciona o excluye evidencias para el anexo"]
+    D --> E{"¿Faltan correcciones?"}
+    E -->|Sí| F["Solicitar cambios o agregar tarea de corrección"]
+    F --> G["La hoja vuelve a EN_PROGRESO"]
+    G --> H["Se reabre la última etapa"]
+    H --> I["El operador completa la corrección"]
+    I --> A
+    E -->|No| J["Ingeniería finaliza los anexos"]
+    J --> K["Hoja PENDIENTE_APROBACION_CALIDAD"]
+    K --> L["Calidad revisa observaciones y evidencias seleccionadas"]
+    L --> M{"¿Calidad aprueba?"}
+    M -->|No| N["Rechazo con motivo"]
+    N --> G
+    M -->|Sí| O["Hoja COMPLETADA"]
+    O --> P["ODS LISTA_PARA_ENTREGA"]
+    P --> Q["Ventas confirma la entrega"]
+    Q --> R["ODS ENTREGADA"]
+    R --> S["Fin del proceso operativo"]

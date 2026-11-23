@@ -1,0 +1,32 @@
+%% CAMI · TurboPre Services
+%% Flujo general del proceso: ODS → Inspección → Hoja de ruta → Anexos → Calidad → Entrega
+flowchart TD
+    A["Ventas crea la ODS<br/>Estado: ABIERTA"] --> B["Taller recibe la ODS"]
+    B --> C["Taller crea la inspección"]
+    C --> D["Operadores, Ingeniería y Calidad ejecutan tareas"]
+    D --> E{"¿Todas las tareas de inspección completas?"}
+    E -->|No| D
+    E -->|Sí| F["Taller aprueba la inspección"]
+    F --> G["Ingeniería crea la hoja de ruta<br/>desde la inspección aprobada"]
+    G --> H["Gerente revisa la hoja de ruta"]
+    H --> I{"¿Aprueba la hoja?"}
+    I -->|No| J["La hoja vuelve a BORRADOR"]
+    J --> G
+    I -->|Sí| K["Hoja LIBERADA a taller"]
+    K --> L["Operadores ejecutan tareas por etapa"]
+    L --> M{"¿Todas las tareas de la hoja completas?"}
+    M -->|No| L
+    M -->|Sí| N["Ingeniería revisa y selecciona anexos"]
+    N --> O{"¿Anexos conformes?"}
+    O -->|No| P["La hoja vuelve a EN_PROGRESO<br/>se reabre la última etapa"]
+    P --> L
+    O -->|Sí| Q["Calidad revisa la hoja"]
+    Q --> R{"¿Calidad aprueba?"}
+    R -->|No| P
+    R -->|Sí| S["Hoja COMPLETADA<br/>ODS LISTA_PARA_ENTREGA"]
+    S --> T["Ventas confirma la entrega"]
+    T --> U["ODS ENTREGADA"]
+
+    A -.->|Cancelación| V["ODS CANCELADA"]
+    C -.->|Inspección rechazada| D
+    K -.->|Cancelación| W["Hoja CANCELADA"]

@@ -1,0 +1,52 @@
+%% CAMI · TurboPre Services
+%% Secuencia: ejecución de la hoja, anexos, Calidad y entrega de la ODS
+sequenceDiagram
+    autonumber
+    actor O as Operador / Ingeniería / Calidad
+    actor I as Ingeniería
+    actor Q as Calidad
+    actor V as Ventas
+    participant API as API CAMI
+    participant DB as PostgreSQL
+
+    O->>API: GET /tasks/my
+    API-->>O: Tareas propias o de su puesto
+
+    O->>API: POST /tasks/:id/complete
+    API->>DB: Validar que la hoja esté LIBERADA o EN_PROGRESO
+    API->>DB: Validar etapa, puesto, bloqueo y evidencia
+    API->>DB: Guardar tarea COMPLETADA + evidencia
+
+    alt Quedan tareas pendientes
+        API->>DB: Hoja EN_PROGRESO
+    else Todas las tareas completas
+        API->>DB: Hoja PENDIENTE_REVISION_ANEXOS
+    end
+
+    API-->>O: Tarea completada
+
+    I->>API: PATCH /route-sheets/:id/tasks/:taskId/annex
+    API->>DB: Marcar evidencia como incluida/excluida del anexo
+    API-->>I: Anexo actualizado
+
+    I->>API: POST /route-sheets/:id/finalize-annexes
+    API->>DB: Hoja PENDIENTE_APROBACION_CALIDAD + revisión de anexos
+    API-->>I: Anexos enviados a Calidad
+
+    Q->>API: Consultar hoja en estado PENDIENTE_APROBACION_CALIDAD
+    API-->>Q: Observaciones y evidencias seleccionadas
+
+    alt Calidad aprueba
+        Q->>API: POST /route-sheets/:id/approve-quality
+        API->>DB: Hoja COMPLETADA + revisión de Calidad
+        API->>DB: ODS LISTA_PARA_ENTREGA
+        API-->>Q: Visto bueno registrado
+    else Calidad rechaza
+        Q->>API: POST /route-sheets/:id/reject-quality
+        API->>DB: Hoja EN_PROGRESO + reabrir última etapa
+        API-->>Q: Hoja devuelta para corrección
+    end
+
+    V->>API: POST /service-orders/:id/deliver
+    API->>DB: ODS ENTREGADA + deliveredAt
+    API-->>V: Entrega confirmada

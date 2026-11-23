@@ -1,0 +1,42 @@
+%% CAMI · TurboPre Services
+%% Procesos de almacén: solicitudes, préstamos, stock y calibración
+flowchart TD
+    subgraph SOLICITUD["Solicitud de material"]
+        A["Se necesita un repuesto o consumible"] --> B["Crear solicitud con una o varias líneas"]
+        B --> C{"¿El artículo está en stock?"}
+        C -->|Sí| D["Reservar y entregar"]
+        C -->|No| E["Marcar la línea como REQUIERE_COMPRA"]
+        E --> F["Procura realiza la compra"]
+        F --> G["Recepción: movimiento de ENTRADA"]
+        G --> D
+        D --> H["Movimiento de SALIDA"]
+        H --> I{"¿Se cubrieron todas las líneas?"}
+        I -->|Sí| J["Solicitud CUMPLIDA"]
+        I -->|No| K["Solicitud PARCIALMENTE_CUMPLIDA"]
+        B -.->|Cancelación| L["Solicitud CANCELADA"]
+    end
+
+    subgraph PRESTAMO["Préstamo de herramientas o equipos"]
+        M["Se necesita una herramienta o equipo"] --> N["Crear préstamo y autorizarlo"]
+        N --> O["Entregar unidad serializada"]
+        O --> P["Unidad en estado PRESTADO"]
+        P --> Q{"¿Se devuelve todo?"}
+        Q -->|Sí| R["Unidad DISPONIBLE<br/>préstamo DEVUELTO"]
+        Q -->|No| S["Préstamo PARCIALMENTE_DEVUELTO"]
+        S --> T["Registrar devolución parcial"]
+        T --> Q
+    end
+
+    subgraph CALIBRACION["Calibración"]
+        U["Unidad requiere calibración"] --> V["Registrar calibración"]
+        V --> W{"Resultado"}
+        W -->|APROBADA| X["Unidad disponible"]
+        W -->|CONDICIONAL| Y["Usar con restricción"]
+        W -->|FALLIDA| Z["Unidad a MANTENIMIENTO o RETIRADA"]
+        X --> AA["Actualizar próximo vencimiento"]
+        Y --> AA
+        Z --> AA
+    end
+
+    J --> CONSUMO["Consumo asociado a la ODS o a la hoja de ruta"]
+    R --> CONSUMO

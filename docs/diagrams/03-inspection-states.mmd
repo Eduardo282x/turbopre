@@ -1,0 +1,19 @@
+%% CAMI · TurboPre Services
+%% Ciclo de vida de la inspección
+stateDiagram-v2
+    [*] --> ABIERTA
+    ABIERTA --> EN_PROGRESO: Taller inicia la ejecución
+    ABIERTA --> CANCELADA: Cancelación
+    EN_PROGRESO --> COMPLETADA: Todas las tareas están completas
+    EN_PROGRESO --> CANCELADA: Cancelación
+    COMPLETADA --> APROBADA: Taller aprueba
+    COMPLETADA --> RECHAZADA: Taller rechaza con motivo
+    RECHAZADA --> EN_PROGRESO: Se corrige y se reinicia
+    APROBADA --> [*]
+    CANCELADA --> [*]
+
+    note right of COMPLETADA
+        Solo se puede aprobar cuando
+        todas las tareas están COMPLETADAS.
+        Al rechazar se reabre la última etapa.
+    end note

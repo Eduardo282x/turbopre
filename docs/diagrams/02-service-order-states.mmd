@@ -1,0 +1,23 @@
+%% CAMI · TurboPre Services
+%% Estados almacenados de la Orden de Servicio (ODS)
+stateDiagram-v2
+    [*] --> ABIERTA
+    ABIERTA --> EN_PROGRESO: Se crea la inspección o inicia la ejecución
+    ABIERTA --> CANCELADA: Cancelación
+    EN_PROGRESO --> LISTA_PARA_ENTREGA: Calidad aprueba la hoja de ruta
+    EN_PROGRESO --> CANCELADA: Cancelación
+    LISTA_PARA_ENTREGA --> ENTREGADA: Ventas confirma la entrega
+    LISTA_PARA_ENTREGA --> CANCELADA: Cancelación
+    ENTREGADA --> CERRADA: Cierre administrativo
+    ENTREGADA --> [*]
+    CERRADA --> [*]
+    CANCELADA --> [*]
+
+    note right of EN_PROGRESO
+        El estado visible se deriva de la ODS,
+        la inspección y la hoja de ruta:
+        RECIBIDA, EN_INSPECCION,
+        INSPECCION_APROBADA, EN_HOJA_RUTA,
+        EN_EJECUCION, EN_ANEXOS, EN_CALIDAD,
+        LISTA_PARA_ENTREGA, ENTREGADA o CANCELADA.
+    end note

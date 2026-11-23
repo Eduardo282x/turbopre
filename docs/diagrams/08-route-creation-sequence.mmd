@@ -1,0 +1,55 @@
+%% CAMI · TurboPre Services
+%% Secuencia: creación de la hoja de ruta desde una inspección aprobada
+sequenceDiagram
+    autonumber
+    actor V as Ventas
+    actor T as Taller
+    actor O as Operadores / Calidad
+    actor I as Ingeniería
+    actor G as Gerente
+    participant API as API CAMI
+    participant DB as PostgreSQL
+
+    V->>API: POST /service-orders
+    API->>DB: Crear ODS en estado ABIERTA
+    API-->>V: ODS creada
+
+    T->>API: POST /inspections
+    API->>DB: Crear inspección + tareas
+    API-->>T: Inspección EN_PROGRESO
+
+    loop Ejecución de tareas de inspección
+        O->>API: GET /tasks/my
+        API-->>O: Tareas propias o de su puesto
+        O->>API: POST /tasks/:id/complete
+        API->>DB: Validar etapa/puesto y guardar evidencia
+        API->>DB: Actualizar tarea e inspección
+        API-->>O: Tarea COMPLETADA
+    end
+
+    T->>API: POST /inspections/:id/approve
+    API->>DB: Inspección APROBADA
+    API-->>T: Inspección aprobada
+
+    I->>API: POST /route-sheets
+    Note over API,DB: Promueve las tareas de la inspección<br/>y crea las tareas nuevas de la hoja
+    API->>DB: Hoja en BORRADOR + tareas
+    API-->>I: Hoja creada
+
+    I->>API: PUT /route-sheets/:id/tasks
+    API->>DB: Reemplazar tareas de la hoja
+    API-->>I: Tareas actualizadas
+
+    I->>API: POST /route-sheets/:id/submit
+    API->>DB: Hoja PENDIENTE_APROBACION
+    API-->>I: Hoja enviada
+
+    alt Gerente aprueba
+        G->>API: POST /route-sheets/:id/approve
+        API->>DB: Hoja LIBERADA + revisión APROBADA
+        API-->>G: Hoja liberada
+    else Gerente rechaza
+        G->>API: POST /route-sheets/:id/reject
+        API->>DB: Hoja BORRADOR + revisión RECHAZADA
+        API-->>G: Hoja devuelta a Ingeniería
+    end
