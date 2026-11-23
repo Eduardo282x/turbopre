@@ -82,6 +82,14 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 | `POST/PATCH` | `/api/service-orders/...` | Crear y editar ODS. `ADMIN` y `SALES`. |
 | `POST` | `/api/service-orders/:id/cancel` | Cancelar una ODS. `ADMIN` y `SALES`. |
 | `POST` | `/api/service-orders/:id/deliver` | Confirmar entrega de una ODS lista. `ADMIN` y `SALES`. |
+| `GET` | `/api/inspections` / `/api/inspections/:id` | Inspecciones con ODS, cliente, equipo, tareas, avance y aprobación. |
+| `POST` | `/api/inspections` | Crear inspección con tareas. `ADMIN` y `WORKSHOP`. |
+| `PATCH` | `/api/inspections/:id` | Actualizar hallazgos. `ADMIN` y `WORKSHOP`. |
+| `POST/PATCH/DELETE` | `/api/inspections/:id/tasks...` | Agregar, editar o eliminar tareas. `ADMIN` y `WORKSHOP`. |
+| `POST` | `/api/inspections/:id/approve` | Aprobar inspección cuando todas las tareas están completas. `ADMIN` y `WORKSHOP`. |
+| `POST` | `/api/inspections/:id/reject` | Rechazar inspección y reabrir la última etapa. `ADMIN` y `WORKSHOP`. |
+| `GET` | `/api/tasks/my` | Tareas propias o de mi puesto, con contexto de inspección/hoja. |
+| `POST` | `/api/tasks/:id/complete` | Completar tarea con evidencia y observaciones, validando puesto/etapa. |
 | `GET` | `/api/users/options` | Opciones de usuario para asignaciones (responsables, tareas). |
 
 ### Formato de respuesta

@@ -9,6 +9,7 @@ import { getRoleDisplay } from '@/features/preview/config';
 import { getMyTasks, getPendingApprovals, getQualityQueue, getWarehousePendingItems } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { useMyTasks } from '@/hooks/use-inspections';
 import { useAuthStore } from '@/stores/use-auth-store';
 import { getInitials } from '@/lib/formatters';
 import { getNavigationForRole, type NavBadge } from '@/lib/navigation';
@@ -24,14 +25,19 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed = false, onToggleCollapse, onNavigate, className }: AppSidebarProps) {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
+  const myTasksQuery = useMyTasks();
   const signOut = useAuthStore((state) => state.signOut);
   const navigate = useNavigate();
 
   if (!user) return null;
 
   const groups = getNavigationForRole(user.role);
+  const apiTaskCount = myTasksQuery.data?.length ?? 0;
+  const previewRouteTaskCount = getMyTasks(db, user).filter(
+    (item) => item.routeSheet,
+  ).length;
   const counts: Record<NavBadge, number> = {
-    tasks: getMyTasks(db, user).length,
+    tasks: apiTaskCount + previewRouteTaskCount,
     approvals: getPendingApprovals(db).length,
     requests: getWarehousePendingItems(db).length,
     quality: getQualityQueue(db).length,

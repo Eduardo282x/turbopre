@@ -91,6 +91,7 @@ export class UsersService {
         fullName: true,
         username: true,
         role: true,
+        jobPosition: { select: { id: true, name: true } },
       },
       orderBy: { fullName: 'asc' },
     });
@@ -100,6 +101,8 @@ export class UsersService {
       name: user.fullName,
       username: user.username,
       role: user.role,
+      jobPositionId: user.jobPosition?.id ?? null,
+      jobPositionName: user.jobPosition?.name ?? null,
     }));
   }
 

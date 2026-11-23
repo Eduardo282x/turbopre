@@ -9,3 +9,4 @@ export * from './domain/catalogs.js';
 export * from './domain/clients.js';
 export * from './domain/projects.js';
 export * from './domain/service-orders.js';
+export * from './domain/inspections.js';

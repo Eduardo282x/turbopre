@@ -31,8 +31,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  getApprovedInspectionsWithoutRoute,
-  getInspectionMetrics,
   getMyTasks,
   getPendingApprovals,
   getProcessWorkloadData,
@@ -43,6 +41,7 @@ import {
 } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { useInspections, useMyTasks } from '@/hooks/use-inspections';
 import { useServiceOrders } from '@/hooks/use-commercial-data';
 import type { RouteSheetWithRelations } from '@/features/preview/types';
 import type { ServiceOrderRecord } from '@turbopre/shared';
@@ -92,6 +91,8 @@ export function DashboardPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
   const ordersQuery = useServiceOrders();
+  const inspectionsQuery = useInspections();
+  const myTasksQuery = useMyTasks();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -99,7 +100,15 @@ export function DashboardPage() {
   if (user.role === 'WAREHOUSE') return <Navigate to="/almacen/inventario" replace />;
 
   const routeMetrics = getRouteMetrics(db);
-  const inspectionMetrics = getInspectionMetrics(db);
+  const inspections = inspectionsQuery.data ?? [];
+  const inspectionMetrics = {
+    total: inspections.length,
+    open: inspections.filter((inspection) => inspection.status === 'OPEN').length,
+    inProgress: inspections.filter((inspection) => inspection.status === 'IN_PROGRESS').length,
+    completed: inspections.filter((inspection) => inspection.status === 'COMPLETED').length,
+    approved: inspections.filter((inspection) => inspection.status === 'APPROVED').length,
+    rejected: inspections.filter((inspection) => inspection.status === 'REJECTED').length,
+  };
   const statusData = getRouteStatusChartData(db);
   const workload = getProcessWorkloadData(db).filter((item) => item.value > 0);
   const orders = ordersQuery.data ?? [];
@@ -118,10 +127,19 @@ export function DashboardPage() {
     .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
     .slice(0, 5);
   const upcoming = getUpcomingDeliveries(db);
-  const myTasks = getMyTasks(db, user);
+  const apiMyTasks = myTasksQuery.data ?? [];
+  const previewRouteTasks = getMyTasks(db, user).filter((item) => item.routeSheet);
+  const myTasksCount = apiMyTasks.length + previewRouteTasks.length;
   const approvals = getPendingApprovals(db);
   const qualityQueue = getQualityQueue(db);
-  const approvedInspections = getApprovedInspectionsWithoutRoute(db);
+  const previewRouteInspectionIds = new Set(
+    db.routeSheets.map((route) => route.inspectionId),
+  );
+  const approvedInspections = inspections.filter(
+    (inspection) =>
+      inspection.status === 'APPROVED' &&
+      !previewRouteInspectionIds.has(inspection.id),
+  );
   const prompt = rolePrompts[user.role as keyof typeof rolePrompts];
 
   const orderColumns: DataTableColumn<ServiceOrderRecord>[] = [
@@ -306,7 +324,7 @@ export function DashboardPage() {
               <p className="text-xs leading-relaxed text-muted-foreground">{prompt.description}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{myTasks.length} tareas</Badge>
+              <Badge variant="outline">{myTasksCount} tareas</Badge>
               {user.role === 'PROJECT_MANAGER' && <Badge variant="outline">{approvals.length} aprobaciones</Badge>}
               {(user.role === 'QUALITY' || user.role === 'ADMIN') && <Badge variant="outline">{qualityQueue.length} en calidad</Badge>}
               {user.role === 'ENGINEER' && (

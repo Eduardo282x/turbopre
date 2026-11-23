@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -26,22 +27,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { INSPECTION_STATUS_META } from '@/features/preview/config';
-import {
-  getApprovedInspectionsWithoutRoute,
-  getInspectionMetrics,
-  getInspectionsForWorkshop,
-} from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { InspectionWithRelations, NewInspectionInput } from '@/features/preview/types';
+import { useInspections } from '@/hooks/use-inspections';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/formatters';
 import { canCreateInspection, canManageRoutes } from '@/lib/permissions';
+import type { CreateInspectionInput, InspectionRecord } from '@turbopre/shared';
+import { inspectionsService } from '@/services/inspections/inspections.service';
 import { InspectionFormDialog } from './inspection-form-dialog';
 
 export function InspectionsPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const createInspection = usePreviewStore((state) => state.createInspection);
+  const queryClient = useQueryClient();
+  const inspectionsQuery = useInspections();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [formOpen, setFormOpen] = useState(false);
@@ -56,25 +56,67 @@ export function InspectionsPage() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const inspections = getInspectionsForWorkshop(db);
+  const createMutation = useMutation({
+    mutationFn: (input: CreateInspectionInput) => inspectionsService.create(input),
+    onSuccess: (inspection) => {
+      void queryClient.invalidateQueries({ queryKey: ['inspections'] });
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+      toast.success('Inspección creada y tareas asignadas', {
+        description: inspection.code,
+      });
+      setFormOpen(false);
+      navigate(`/taller/inspecciones/${inspection.id}`);
+    },
+    onError: (error) =>
+      toast.error('No se pudo crear la inspección', {
+        description: getApiErrorMessage(error),
+      }),
+  });
+
+  const inspections = useMemo(
+    () => inspectionsQuery.data ?? [],
+    [inspectionsQuery.data],
+  );
   const filtered = useMemo(
-    () => inspections.filter((inspection) => statusFilter === 'all' || inspection.status === statusFilter),
+    () =>
+      inspections.filter(
+        (inspection) =>
+          statusFilter === 'all' || inspection.status === statusFilter,
+      ),
     [inspections, statusFilter],
   );
 
   if (!user) return null;
 
-  const metrics = getInspectionMetrics(db);
-  const approvedPending = getApprovedInspectionsWithoutRoute(db);
+  const metrics = {
+    total: inspections.length,
+    inProgress: inspections.filter((inspection) => inspection.status === 'IN_PROGRESS').length,
+    completed: inspections.filter((inspection) => inspection.status === 'COMPLETED').length,
+    approved: inspections.filter((inspection) => inspection.status === 'APPROVED').length,
+    rejected: inspections.filter((inspection) => inspection.status === 'REJECTED').length,
+  };
+  const previewInspectionIds = new Set(db.inspections.map((inspection) => inspection.id));
+  const previewRouteInspectionIds = new Set(
+    db.routeSheets.map((route) => route.inspectionId),
+  );
+  const approvedPending = inspections.filter(
+    (inspection) =>
+      inspection.status === 'APPROVED' &&
+      previewInspectionIds.has(inspection.id) &&
+      !previewRouteInspectionIds.has(inspection.id),
+  );
 
-  const columns: DataTableColumn<InspectionWithRelations>[] = [
+  const columns: DataTableColumn<InspectionRecord>[] = [
     {
       id: 'inspection',
       header: 'Inspección',
       cell: (inspection) => (
         <div className="min-w-0">
           <p className="font-semibold text-foreground">{inspection.code}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">ODS {inspection.serviceOrder.code}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            ODS {inspection.serviceOrder.orderNumber}
+          </p>
         </div>
       ),
       sortable: true,
@@ -85,9 +127,9 @@ export function InspectionsPage() {
       header: 'Cliente / equipo',
       cell: (inspection) => (
         <div className="text-xs">
-          <p className="font-medium text-foreground">{inspection.client?.name ?? '—'}</p>
+          <p className="font-medium text-foreground">{inspection.serviceOrder.clientName}</p>
           <p className="text-muted-foreground">
-            {inspection.asset?.manufacturer} {inspection.asset?.model} · {inspection.asset?.tag}
+            {inspection.serviceOrder.equipmentCode} · {inspection.serviceOrder.equipmentName}
           </p>
         </div>
       ),
@@ -118,7 +160,7 @@ export function InspectionsPage() {
       cell: (inspection) => (
         <div className="text-xs text-muted-foreground">
           <p>{formatDate(inspection.createdAt)}</p>
-          <p>{inspection.creator.name}</p>
+          <p>{inspection.createdBy.name}</p>
         </div>
       ),
       hideOnMobile: true,
@@ -148,10 +190,34 @@ export function InspectionsPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Inspecciones" value={metrics.total} hint="Recibidas desde ODS" icon={ClipboardCheck} tone="accent" />
-        <KpiCard label="En ejecución" value={metrics.inProgress} hint="Tareas en curso" icon={Timer} tone="info" />
-        <KpiCard label="Aprobadas" value={metrics.approved} hint="Listas para Ingeniería" icon={CheckCircle2} tone="success" />
-        <KpiCard label="Rechazadas" value={metrics.rejected} hint="Requieren corrección" icon={XCircle} tone="danger" />
+        <KpiCard
+          label="Inspecciones"
+          value={metrics.total}
+          hint="Recibidas desde ODS"
+          icon={ClipboardCheck}
+          tone="accent"
+        />
+        <KpiCard
+          label="En ejecución"
+          value={metrics.inProgress}
+          hint="Tareas en curso"
+          icon={Timer}
+          tone="info"
+        />
+        <KpiCard
+          label="Aprobadas"
+          value={metrics.approved}
+          hint="Listas para Ingeniería"
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <KpiCard
+          label="Rechazadas"
+          value={metrics.rejected}
+          hint="Requieren corrección"
+          icon={XCircle}
+          tone="danger"
+        />
       </div>
 
       {approvedPending.length > 0 && canManageRoutes(user) && (
@@ -166,7 +232,8 @@ export function InspectionsPage() {
                   <div className="min-w-0">
                     <p className="font-semibold text-foreground">{inspection.code}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {inspection.client?.name} · {inspection.asset?.model}
+                      {inspection.serviceOrder.clientName} ·{' '}
+                      {inspection.serviceOrder.equipmentName}
                     </p>
                   </div>
                   <InspectionStatusBadge status={inspection.status} />
@@ -189,7 +256,8 @@ export function InspectionsPage() {
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
           <CheckCircle2 className="size-5 text-warning" />
           <p className="flex-1 text-foreground">
-            Hay <strong>{metrics.completed}</strong> inspección(es) completada(s) esperando la aprobación de Taller.
+            Hay <strong>{metrics.completed}</strong> inspección(es) completada(s) esperando la
+            aprobación de Taller.
           </p>
           <Button variant="outline" size="sm" onClick={() => setStatusFilter('COMPLETED')}>
             Ver completadas
@@ -197,14 +265,21 @@ export function InspectionsPage() {
         </div>
       )}
 
+      {inspectionsQuery.isError && (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          {getApiErrorMessage(inspectionsQuery.error, 'No se pudieron cargar las inspecciones')}
+        </p>
+      )}
+
       <DataTable
         data={filtered}
         columns={columns}
         getRowId={(inspection) => inspection.id}
+        isLoading={inspectionsQuery.isLoading}
         search={{
           placeholder: 'Buscar por inspección, ODS, cliente o equipo…',
           getText: (inspection) =>
-            `${inspection.code} ${inspection.serviceOrder.code} ${inspection.client?.name ?? ''} ${inspection.asset?.model ?? ''}`,
+            `${inspection.code} ${inspection.serviceOrder.orderNumber} ${inspection.serviceOrder.clientName} ${inspection.serviceOrder.equipmentCode} ${inspection.serviceOrder.equipmentName}`,
         }}
         filters={
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -225,7 +300,8 @@ export function InspectionsPage() {
           {
             label: 'Ver inspección',
             icon: Eye,
-            onSelect: (inspection) => navigate(`/taller/inspecciones/${inspection.id}`),
+            onSelect: (inspection) =>
+              navigate(`/taller/inspecciones/${inspection.id}`),
           },
         ]}
         onRowClick={(inspection) => navigate(`/taller/inspecciones/${inspection.id}`)}
@@ -239,10 +315,8 @@ export function InspectionsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         defaultOrderId={defaultOrderId}
-        onSubmit={(input: NewInspectionInput) => {
-          createInspection(input, user.id);
-          toast.success('Inspección creada y tareas asignadas');
-        }}
+        pending={createMutation.isPending}
+        onSubmit={(input) => createMutation.mutate(input)}
       />
     </div>
   );

@@ -32,17 +32,16 @@ import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AUDIT_ACTION_META } from '@/features/preview/config';
-import {
-  getInspectionWithRelations,
-  getRouteSheetWithRelations,
-  getServiceOrderStatus,
-} from '@/features/preview/store/selectors';
+import { getRouteSheetWithRelations } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { useInspection } from '@/hooks/use-inspections';
 import { useServiceOrder } from '@/hooks/use-commercial-data';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { formatDate, formatDateTime } from '@/lib/formatters';
+import { previewRouteStatusToApi } from '@/lib/preview-status';
 import { canCreateInspection, canManageRoutes, canManageServiceOrders } from '@/lib/permissions';
+import { deriveServiceOrderWorkflowStatus } from '@turbopre/shared';
 import type { CreateServiceOrderInput, ServiceOrderWorkflowStatus } from '@turbopre/shared';
 import { serviceOrdersService } from '@/services/service-orders/service-orders.service';
 import { ServiceOrderFormDialog } from './service-order-form-dialog';
@@ -66,6 +65,7 @@ export function ServiceOrderDetailPage() {
   const user = useCurrentUser();
   const queryClient = useQueryClient();
   const orderQuery = useServiceOrder(id);
+  const inspectionQuery = useInspection(orderQuery.data?.inspectionId ?? undefined);
   const db = usePreviewStore((state) => state.db);
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
@@ -153,23 +153,18 @@ export function ServiceOrderDetailPage() {
   }
 
   const previewOrder = db.serviceOrders.find((item) => item.id === order.id);
-  const inspection = previewOrder?.inspectionId
-    ? getInspectionWithRelations(db, previewOrder.inspectionId)
-    : undefined;
+  const inspection = inspectionQuery.data ?? null;
   const routeSheet = previewOrder?.routeSheetId
     ? getRouteSheetWithRelations(db, previewOrder.routeSheetId)
     : undefined;
-  const inspectionId = order.inspectionId ?? previewOrder?.inspectionId;
-  const routeSheetId = order.routeSheetId ?? previewOrder?.routeSheetId;
-  const apiStatusWins = ['READY_FOR_DELIVERY', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(
-    order.status,
-  );
-  const displayStatus = apiStatusWins
-    ? order.workflowStatus
-    : previewOrder
-      ? getServiceOrderStatus(db, previewOrder)
-      : order.workflowStatus;
-  const displayProgress = routeSheet?.progress ?? inspection?.progress ?? order.progress;
+  const inspectionId = order.inspectionId ?? previewOrder?.inspectionId ?? null;
+  const routeSheetId = order.routeSheetId ?? previewOrder?.routeSheetId ?? null;
+  const displayStatus = deriveServiceOrderWorkflowStatus({
+    status: order.status,
+    inspectionStatus: inspection?.status ?? order.inspectionStatus,
+    routeSheetStatus: routeSheet ? previewRouteStatusToApi(routeSheet.status) : null,
+  });
+  const displayProgress = inspection?.progress ?? order.progress;
 
   const currentFlowIndex = Math.max(
     0,
@@ -231,7 +226,7 @@ export function ServiceOrderDetailPage() {
                   Cancelar ODS
                 </Button>
               )}
-              {canCreateInspection(user) && !inspectionId && previewOrder && (
+              {canCreateInspection(user) && !inspectionId && (
                 <Button size="sm" onClick={() => navigate(`/taller/inspecciones?ods=${order.id}`)}>
                   <Plus /> Crear inspección
                 </Button>
@@ -390,7 +385,7 @@ export function ServiceOrderDetailPage() {
                   label={`${inspection.completedTasks} de ${inspection.totalTasks} tareas`}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {inspection.findings ?? 'Sin hallazgos registrados.'}
+                  {inspection.technicalDetails ?? 'Sin hallazgos registrados.'}
                 </p>
                 <Button variant="outline" size="sm" asChild className="w-full">
                   <Link to={`/taller/inspecciones/${inspection.id}`}>
@@ -401,19 +396,13 @@ export function ServiceOrderDetailPage() {
             ) : (
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>Todavía no hay inspección asociada.</p>
-                {previewOrder ? (
-                  canCreateInspection(user) && (
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/taller/inspecciones?ods=${order.id}`)}
-                    >
-                      <Plus /> Crear inspección
-                    </Button>
-                  )
-                ) : (
-                  <p className="text-[11px]">
-                    La creación de inspecciones se conectará en la siguiente fase.
-                  </p>
+                {canCreateInspection(user) && (
+                  <Button
+                    size="sm"
+                    onClick={() => navigate(`/taller/inspecciones?ods=${order.id}`)}
+                  >
+                    <Plus /> Crear inspección
+                  </Button>
                 )}
               </div>
             )}

@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  getServiceOrderStatus,
-  getServiceOrderWithRelations,
-} from '@/features/preview/store/selectors';
+import { deriveServiceOrderWorkflowStatus } from '@turbopre/shared';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { previewRouteStatusToApi } from '@/lib/preview-status';
 import { clientsService } from '@/services/clients/clients.service';
 import { equipmentService } from '@/services/equipment/equipment.service';
 import { projectsService } from '@/services/projects/projects.service';
@@ -51,22 +49,21 @@ export function useServiceOrders() {
 
     return orders.map((order) => {
       const previewOrder = db.serviceOrders.find((item) => item.id === order.id);
-
-      if (!previewOrder) return order;
-
-      const preview = getServiceOrderWithRelations(db, previewOrder.id);
-      const apiStatusWins = ['READY_FOR_DELIVERY', 'DELIVERED', 'CLOSED', 'CANCELLED'].includes(
-        order.status,
-      );
+      const previewRoute = previewOrder?.routeSheetId
+        ? db.routeSheets.find((route) => route.id === previewOrder.routeSheetId)
+        : undefined;
 
       return {
         ...order,
-        inspectionId: order.inspectionId ?? previewOrder.inspectionId ?? null,
-        routeSheetId: order.routeSheetId ?? previewOrder.routeSheetId ?? null,
-        workflowStatus: apiStatusWins
-          ? order.workflowStatus
-          : getServiceOrderStatus(db, previewOrder),
-        progress: apiStatusWins ? order.progress : preview?.progress ?? order.progress,
+        inspectionId: order.inspectionId ?? previewOrder?.inspectionId ?? null,
+        routeSheetId: order.routeSheetId ?? previewOrder?.routeSheetId ?? null,
+        workflowStatus: deriveServiceOrderWorkflowStatus({
+          status: order.status,
+          inspectionStatus: order.inspectionStatus,
+          routeSheetStatus: previewRoute
+            ? previewRouteStatusToApi(previewRoute.status)
+            : null,
+        }),
       };
     });
   }, [query.data, db]);

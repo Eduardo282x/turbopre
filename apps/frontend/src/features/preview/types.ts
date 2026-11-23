@@ -43,10 +43,10 @@ export type PositionId =
 
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-export type TaskStatus = 'BLOCKED' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+export type TaskStatus = 'BLOCKED' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type TaskSource = 'INSPECTION' | 'ROUTE';
 
-export type InspectionStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
+export type InspectionStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 export type RouteStatus =
   | 'DRAFT'

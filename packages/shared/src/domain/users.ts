@@ -38,6 +38,8 @@ export const userOptionSchema = z.object({
   name: z.string(),
   username: z.string(),
   role: userRoleSchema,
+  jobPositionId: z.string().nullable(),
+  jobPositionName: z.string().nullable(),
 });
 export type UserOption = z.infer<typeof userOptionSchema>;
 

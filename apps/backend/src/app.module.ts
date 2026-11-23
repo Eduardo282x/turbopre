@@ -8,11 +8,13 @@ import { ClientsModule } from './clients/clients.module.js';
 import { AllExceptionsFilter } from './common/filters/http.exception.filter.js';
 import { EquipmentModule } from './equipment/equipment.module.js';
 import { HealthModule } from './health/health.module.js';
+import { InspectionsModule } from './inspections/inspections.module.js';
 import { ResponseInterceptor } from './interceptors/responde.interceptor.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { ServiceOrdersModule } from './service-orders/service-orders.module.js';
 import { SitesModule } from './sites/sites.module.js';
+import { TasksModule } from './tasks/tasks.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -33,6 +35,8 @@ import { UsersModule } from './users/users.module.js';
     EquipmentModule,
     ProjectsModule,
     ServiceOrdersModule,
+    InspectionsModule,
+    TasksModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

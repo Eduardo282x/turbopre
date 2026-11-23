@@ -18,6 +18,7 @@ const roles = {
   sales: ['ADMIN', 'SALES'] as const,
   workshop: ['ADMIN', 'WORKSHOP'] as const,
   inspections: ['ADMIN', 'WORKSHOP', 'ENGINEER'] as const,
+  inspectionView: ['ADMIN', 'WORKSHOP', 'ENGINEER', 'OPERATOR', 'QUALITY'] as const,
   spares: ['ADMIN', 'WORKSHOP', 'ENGINEER', 'OPERATOR'] as const,
   projects: ['ADMIN', 'ENGINEER'] as const,
   warehouse: ['ADMIN', 'WAREHOUSE'] as const,
@@ -229,8 +230,14 @@ export const router = createBrowserRouter([
                   return { Component: InspectionsPage };
                 },
               },
+            ],
+          },
+          {
+            path: 'taller/inspecciones/:id',
+            element: <RoleGuard roles={roleList(roles.inspectionView)} />,
+            children: [
               {
-                path: ':id',
+                index: true,
                 lazy: async () => {
                   const { InspectionDetailPage } = await import(
                     '@/pages/workshop/inspection-detail-page'

@@ -850,11 +850,295 @@ async function seedDemoCommercial(): Promise<void> {
   );
 }
 
+type DemoInspectionSeed = {
+  id: string;
+  code: string;
+  serviceOrderId: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'REJECTED';
+  technicalDetails: string;
+  daysAgo: number;
+  approvedDaysAgo?: number;
+  rejectionReason?: string;
+};
+
+const DEMO_INSPECTIONS: DemoInspectionSeed[] = [
+  {
+    id: 'insp-001',
+    code: 'INS-2026-001',
+    serviceOrderId: 'so-1915',
+    status: 'APPROVED',
+    technicalDetails:
+      'Se detectó desgaste en la biela y una fisura superficial en el alojamiento. Calidad verificó la limpieza.',
+    daysAgo: 14,
+    approvedDaysAgo: 11,
+  },
+  {
+    id: 'insp-002',
+    code: 'INS-2026-002',
+    serviceOrderId: 'so-1892',
+    status: 'IN_PROGRESS',
+    technicalDetails:
+      'Inspección de limpieza y medición de excentricidad en curso.',
+    daysAgo: 8,
+  },
+  {
+    id: 'insp-003',
+    code: 'INS-2026-003',
+    serviceOrderId: 'so-1855',
+    status: 'APPROVED',
+    technicalDetails:
+      'Babbitt con desgaste uniforme. Se aprueba rehabilitación por rebabitado y mecanizado.',
+    daysAgo: 18,
+    approvedDaysAgo: 15,
+  },
+  {
+    id: 'insp-004',
+    code: 'INS-2026-004',
+    serviceOrderId: 'so-1901',
+    status: 'APPROVED',
+    technicalDetails:
+      'Estator con polvo y humedad. Bobinas sin daño visible. Se aprueba limpieza, secado y pruebas.',
+    daysAgo: 26,
+    approvedDaysAgo: 23,
+  },
+  {
+    id: 'insp-005',
+    code: 'INS-2026-005',
+    serviceOrderId: 'so-1850',
+    status: 'REJECTED',
+    technicalDetails:
+      'Falta evidencia fotográfica de la limpieza abrasiva.',
+    daysAgo: 10,
+    rejectionReason:
+      'Falta evidencia fotográfica de la limpieza. Repetir inspección.',
+  },
+  {
+    id: 'insp-006',
+    code: 'INS-2026-006',
+    serviceOrderId: 'so-1888',
+    status: 'APPROVED',
+    technicalDetails:
+      'Cámaras de combustión con desgaste leve. Se aprueba limpieza y verificación dimensional.',
+    daysAgo: 20,
+    approvedDaysAgo: 17,
+  },
+  {
+    id: 'insp-007',
+    code: 'INS-2026-007',
+    serviceOrderId: 'so-1870',
+    status: 'APPROVED',
+    technicalDetails:
+      'Rotor con desgaste en sellos. Se aprueba recuperación y balanceo.',
+    daysAgo: 28,
+    approvedDaysAgo: 25,
+  },
+  {
+    id: 'insp-008',
+    code: 'INS-2026-008',
+    serviceOrderId: 'so-1802',
+    status: 'APPROVED',
+    technicalDetails:
+      'Inspección de paso de gases calientes completada. Sin hallazgos críticos.',
+    daysAgo: 58,
+    approvedDaysAgo: 55,
+  },
+  {
+    id: 'insp-009',
+    code: 'INS-2026-009',
+    serviceOrderId: 'so-1920',
+    status: 'APPROVED',
+    technicalDetails:
+      'Bujes con desgaste dimensional. Se aprueba fabricación de reemplazo.',
+    daysAgo: 5,
+    approvedDaysAgo: 3,
+  },
+  {
+    id: 'insp-010',
+    code: 'INS-2026-010',
+    serviceOrderId: 'so-1916',
+    status: 'COMPLETED',
+    technicalDetails:
+      'Limpieza e inspección del rotor Elliott completadas. Se detectó desgaste leve en sellos. Pendiente aprobación de Taller.',
+    daysAgo: 3,
+  },
+];
+
+async function seedDemoInspections(
+  jobPositionIds: Map<string, string>,
+): Promise<void> {
+  if (!shouldSeedDemoUsers()) {
+    console.log('Inspecciones demo omitidas (SEED_DEMO_USERS=false o NODE_ENV=production).');
+    return;
+  }
+
+  const equipmentTypeById = new Map(
+    DEMO_EQUIPMENT.map((equipment) => [equipment.id, equipment.type]),
+  );
+  const equipmentNameById = new Map(
+    DEMO_EQUIPMENT.map((equipment) => [equipment.id, equipment.name]),
+  );
+  let taskCount = 0;
+
+  for (const inspection of DEMO_INSPECTIONS) {
+    const order = DEMO_SERVICE_ORDERS.find(
+      (item) => item.id === inspection.serviceOrderId,
+    );
+
+    if (!order) {
+      throw new Error(`ODS no encontrada para la inspección ${inspection.id}`);
+    }
+
+    const equipmentType = equipmentTypeById.get(order.equipmentId);
+    const equipmentName =
+      equipmentNameById.get(order.equipmentId) ?? order.equipmentId;
+    const primaryPositionCode =
+      equipmentType === 'GENERATOR'
+        ? 'WINDER_I'
+        : equipmentType === 'AUXILIARY'
+          ? 'MACHINE_OPERATOR_I'
+          : 'ROTATING_SPECIALIST';
+    const primaryPositionId = jobPositionIds.get(primaryPositionCode);
+    const qualityPositionId = jobPositionIds.get('QUALITY_INSPECTOR');
+
+    if (!primaryPositionId || !qualityPositionId) {
+      throw new Error('Faltan puestos para sembrar las inspecciones demo');
+    }
+
+    const createdAt = shiftDays(-inspection.daysAgo);
+    const approvedAt = inspection.approvedDaysAgo
+      ? shiftDays(-inspection.approvedDaysAgo)
+      : null;
+    const allCompleted = ['APPROVED', 'COMPLETED'].includes(inspection.status);
+    const firstStageStatus = 'COMPLETED' as const;
+    const secondStageStatus = allCompleted ? ('COMPLETED' as const) : ('PENDING' as const);
+
+    await prisma.inspection.upsert({
+      where: { id: inspection.id },
+      update: {
+        code: inspection.code,
+        serviceOrderId: inspection.serviceOrderId,
+        technicalDetails: inspection.technicalDetails,
+        status: inspection.status,
+        createdById: 'u-workshop',
+        approvedById: approvedAt ? 'u-workshop' : null,
+        approvedAt,
+        rejectionReason: inspection.rejectionReason ?? null,
+        startedAt: createdAt,
+        completedAt: allCompleted ? createdAt : null,
+        createdAt,
+        updatedAt: approvedAt ?? createdAt,
+      },
+      create: {
+        id: inspection.id,
+        code: inspection.code,
+        serviceOrderId: inspection.serviceOrderId,
+        technicalDetails: inspection.technicalDetails,
+        status: inspection.status,
+        createdById: 'u-workshop',
+        approvedById: approvedAt ? 'u-workshop' : null,
+        approvedAt,
+        rejectionReason: inspection.rejectionReason ?? null,
+        startedAt: createdAt,
+        completedAt: allCompleted ? createdAt : null,
+        createdAt,
+        updatedAt: approvedAt ?? createdAt,
+      },
+    });
+
+    const tasks = [
+      {
+        stage: 1,
+        jobPositionId: primaryPositionId,
+        description: `Inspección visual y dimensional del equipo ${equipmentName}.`,
+        criteria: 'PR-TUR-100',
+        formRef: 'FO-ING-110',
+        status: firstStageStatus,
+      },
+      {
+        stage: 1,
+        jobPositionId: qualityPositionId,
+        description: 'Inspección de limpieza y registro fotográfico.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-155',
+        status: firstStageStatus,
+      },
+      {
+        stage: 2,
+        jobPositionId: primaryPositionId,
+        description: 'Verificación dimensional y pruebas complementarias.',
+        criteria: 'PR-TUR-120',
+        formRef: 'FO-ING-120',
+        status: secondStageStatus,
+      },
+      {
+        stage: 2,
+        jobPositionId: qualityPositionId,
+        description: 'Liberación de calidad de la inspección.',
+        criteria: 'PR-CAL-110',
+        formRef: 'FO-ING-160',
+        status: secondStageStatus,
+      },
+    ];
+
+    for (const [index, task] of tasks.entries()) {
+      const taskId = `${inspection.id}-task-${String(index + 1).padStart(2, '0')}`;
+      const completed = task.status === 'COMPLETED';
+
+      await prisma.task.upsert({
+        where: { id: taskId },
+        update: {
+          inspectionId: inspection.id,
+          jobPositionId: task.jobPositionId,
+          assignedToId: null,
+          createdById: 'u-workshop',
+          sequence: (index + 1) * 10,
+          stage: task.stage,
+          source: 'INSPECTION',
+          description: task.description,
+          criteria: task.criteria,
+          formRef: task.formRef,
+          status: task.status,
+          requiresEvidence: true,
+          startedAt: completed ? createdAt : null,
+          completedAt: completed ? createdAt : null,
+          createdAt,
+          updatedAt: createdAt,
+        },
+        create: {
+          id: taskId,
+          inspectionId: inspection.id,
+          jobPositionId: task.jobPositionId,
+          assignedToId: null,
+          createdById: 'u-workshop',
+          sequence: (index + 1) * 10,
+          stage: task.stage,
+          source: 'INSPECTION',
+          description: task.description,
+          criteria: task.criteria,
+          formRef: task.formRef,
+          status: task.status,
+          requiresEvidence: true,
+          startedAt: completed ? createdAt : null,
+          completedAt: completed ? createdAt : null,
+          createdAt,
+          updatedAt: createdAt,
+        },
+      });
+      taskCount += 1;
+    }
+  }
+
+  console.log(
+    `Inspecciones demo listas: ${DEMO_INSPECTIONS.length} inspecciones y ${taskCount} tareas.`,
+  );
+}
+
 async function main(): Promise<void> {
   const jobPositionIds = await seedOrganization();
   const adminId = await seedAdmin();
   await seedDemoUsers(adminId, jobPositionIds);
   await seedDemoCommercial();
+  await seedDemoInspections(jobPositionIds);
   console.log('Catálogos de organización, administrador y usuarios demo sembrados.');
 }
 

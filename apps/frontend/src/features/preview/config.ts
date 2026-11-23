@@ -169,6 +169,7 @@ export const INSPECTION_STATUS_META: Record<InspectionStatus, { label: string; t
   COMPLETED: { label: 'Completada', tone: 'info' },
   APPROVED: { label: 'Aprobada', tone: 'success' },
   REJECTED: { label: 'Rechazada', tone: 'danger' },
+  CANCELLED: { label: 'Cancelada', tone: 'neutral' },
 };
 
 export const SERVICE_ORDER_STATUS_META: Record<ServiceOrderStatus, { label: string; tone: Tone }> = {
@@ -189,6 +190,7 @@ export const TASK_STATUS_META: Record<TaskStatus, { label: string; tone: Tone }>
   PENDING: { label: 'Pendiente', tone: 'warning' },
   IN_PROGRESS: { label: 'En proceso', tone: 'accent' },
   COMPLETED: { label: 'Completada', tone: 'success' },
+  CANCELLED: { label: 'Cancelada', tone: 'danger' },
 };
 
 export const PRIORITY_META: Record<Priority, { label: string; tone: Tone }> = {

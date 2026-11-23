@@ -484,6 +484,8 @@ model Task {
   stage            Int        @default(1)
   source           TaskSource @default(ROUTE_SHEET)
   description      String
+  criteria         String?
+  formRef          String?    @map("form_ref")
   status           TaskStatus @default(PENDING)
   requiresEvidence Boolean    @default(true) @map("requires_evidence")
   estimatedMinutes Int?       @map("estimated_minutes")

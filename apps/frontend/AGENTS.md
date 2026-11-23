@@ -81,17 +81,18 @@ src/
   login real con los usuarios sembrados (`demo1234`). En producción no aparecen
   (ver `isPreviewMode`).
 
-## Estado de la migración (Fase 2)
+## Estado de la migración (Fase 3)
 
 - **Conectado a la API**: login, `/auth/me`, sesión, usuarios, catálogos,
-  clientes, sitios, equipos, proyectos y órdenes de servicio.
+  clientes, sitios, equipos, proyectos, órdenes de servicio, inspecciones y
+  tareas de inspección.
 - **Sigue en preview** (`src/features/preview/`, zustand + `localStorage`):
-  inspecciones, tareas, hojas de ruta, anexos, calidad, repuestos, inventario,
+  hojas de ruta, tareas de hoja de ruta, anexos, calidad, repuestos, inventario,
   solicitudes, préstamos, calibración, rendimiento, mapa de planta, auditoría y
   datos demo de configuración.
-- Mientras inspección/hoja sigan en preview, `useServiceOrders` mezcla el estado
-  y avance de la semilla preview para las ODS demo con IDs estables. Las ODS
-  nuevas usan exclusivamente la API.
+- Las inspecciones y sus tareas ya son reales. `useServiceOrders` y los detalles
+  de ODS combinan el estado de la inspección API con el estado de la hoja de ruta
+  que aún vive en preview.
 - Los roles son los canónicos del backend: Administrador (`ADMIN`), Ventas,
   Taller, Ingeniería (`ENGINEER`), Operador, Calidad, Gerente de Proyecto
   (`PROJECT_MANAGER`) y Almacén.
@@ -108,8 +109,8 @@ src/
 - La tabla reutilizable está en `src/components/table-kit/` y las gráficas en
   `src/components/charts/` (shadcn Chart + Recharts).
 - Detalles y modelo provisional: `docs/preview-frontend.md`.
-- Para continuar la migración: reemplazar los selectores del store preview por
-  `services/<dominio>/` + TanStack Query, módulo por módulo.
+- Para continuar la migración: conectar hojas de ruta y tareas de hoja en la
+  Fase 4, y luego almacén/analítica.
 
 ## Entorno
 

@@ -86,8 +86,9 @@ Deseable a futuro (nada de esto está implementado todavía):
   la documentación funcional y los diagramas están en `docs/domain-model.md`.
 - Deploy de QA preparado: `apps/frontend/vercel.json` y `render.yaml`.
 - **Conectado**: login, sesión JWT, `/auth/me`, usuarios, catálogos, clientes,
-  sitios, equipos, proyectos y órdenes de servicio.
-- **Pendiente**: migrar inspecciones, tareas, hojas de ruta, anexos, calidad,
+  sitios, equipos, proyectos, órdenes de servicio, inspecciones y tareas de
+  inspección.
+- **Pendiente**: migrar hojas de ruta, tareas de hoja de ruta, anexos, calidad,
   almacén, planta, analítica y auditoría desde el preview en `localStorage` a la
   API, fase por fase.
 

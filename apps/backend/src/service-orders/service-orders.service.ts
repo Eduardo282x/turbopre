@@ -470,6 +470,7 @@ export class ServiceOrdersService {
         inspectionStatus: inspection?.status as InspectionStatus | undefined,
         routeSheetStatus: order.routeSheet?.status as RouteSheetStatus | undefined,
       }),
+      inspectionStatus: (inspection?.status as InspectionStatus | undefined) ?? null,
       requestedAt: order.requestedAt.toISOString(),
       dueAt: order.dueAt?.toISOString() ?? null,
       deliveredAt: order.deliveredAt?.toISOString() ?? null,

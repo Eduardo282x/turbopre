@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { equipmentTypeSchema } from './clients.js';
 import {
+  inspectionStatusSchema,
   prioritySchema,
   serviceOrderStatusSchema,
   serviceOrderWorkflowStatusSchema,
@@ -78,6 +79,7 @@ export const serviceOrderRecordSchema = z.object({
   priority: prioritySchema,
   status: serviceOrderStatusSchema,
   workflowStatus: serviceOrderWorkflowStatusSchema,
+  inspectionStatus: inspectionStatusSchema.nullable(),
   requestedAt: z.string(),
   dueAt: z.string().nullable(),
   deliveredAt: z.string().nullable(),
