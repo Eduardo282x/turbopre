@@ -39,13 +39,13 @@ import {
   getQualityQueue,
   getRouteMetrics,
   getRouteStatusChartData,
-  getServiceOrderMetrics,
-  getServiceOrdersWithRelations,
   getUpcomingDeliveries,
 } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { RouteSheetWithRelations, ServiceOrderWithRelations } from '@/features/preview/types';
+import { useServiceOrders } from '@/hooks/use-commercial-data';
+import type { RouteSheetWithRelations } from '@/features/preview/types';
+import type { ServiceOrderRecord } from '@turbopre/shared';
 import { daysUntil, formatDate } from '@/lib/formatters';
 import { canManageRoutes } from '@/lib/permissions';
 
@@ -91,6 +91,7 @@ const rolePrompts = {
 export function DashboardPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
+  const ordersQuery = useServiceOrders();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -98,12 +99,23 @@ export function DashboardPage() {
   if (user.role === 'WAREHOUSE') return <Navigate to="/almacen/inventario" replace />;
 
   const routeMetrics = getRouteMetrics(db);
-  const orderMetrics = getServiceOrderMetrics(db);
   const inspectionMetrics = getInspectionMetrics(db);
   const statusData = getRouteStatusChartData(db);
   const workload = getProcessWorkloadData(db).filter((item) => item.value > 0);
-  const recentOrders = getServiceOrdersWithRelations(db)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const orders = ordersQuery.data ?? [];
+  const orderMetrics = {
+    total: orders.length,
+    inInspection: orders.filter((order) => order.workflowStatus === 'IN_INSPECTION').length,
+    inExecution: orders.filter((order) => order.workflowStatus === 'IN_EXECUTION').length,
+    delivered: orders.filter((order) => order.workflowStatus === 'DELIVERED').length,
+    critical: orders.filter(
+      (order) =>
+        order.priority === 'CRITICAL' &&
+        !['DELIVERED', 'CANCELLED'].includes(order.workflowStatus),
+    ).length,
+  };
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
     .slice(0, 5);
   const upcoming = getUpcomingDeliveries(db);
   const myTasks = getMyTasks(db, user);
@@ -112,26 +124,32 @@ export function DashboardPage() {
   const approvedInspections = getApprovedInspectionsWithoutRoute(db);
   const prompt = rolePrompts[user.role as keyof typeof rolePrompts];
 
-  const orderColumns: DataTableColumn<ServiceOrderWithRelations>[] = [
+  const orderColumns: DataTableColumn<ServiceOrderRecord>[] = [
     {
       id: 'order',
       header: 'Orden de servicio',
       cell: (order) => (
         <div className="min-w-0">
-          <p className="font-medium text-foreground">{order.code}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">{order.subCode}</p>
+          <p className="font-medium text-foreground">{order.orderNumber}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {order.parentOrderNumber
+              ? `Sub-ODS de ${order.parentOrderNumber}`
+              : 'ODS principal'}
+          </p>
         </div>
       ),
       sortable: true,
-      sortValue: (order) => order.code,
+      sortValue: (order) => order.orderNumber,
     },
     {
       id: 'client',
       header: 'Cliente / equipo',
       cell: (order) => (
         <div className="text-xs">
-          <p className="text-foreground">{order.client?.name ?? '—'}</p>
-          <p className="text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model}</p>
+          <p className="text-foreground">{order.client.name}</p>
+          <p className="text-muted-foreground">
+            {order.equipment.code} · {order.equipment.name}
+          </p>
         </div>
       ),
       hideOnMobile: true,
@@ -139,7 +157,7 @@ export function DashboardPage() {
     {
       id: 'status',
       header: 'Estado',
-      cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
+      cell: (order) => <ServiceOrderStatusBadge status={order.workflowStatus} />,
       hideOnMobile: true,
     },
     {
@@ -263,6 +281,7 @@ export function DashboardPage() {
             data={recentOrders}
             columns={orderColumns}
             getRowId={(order) => order.id}
+            isLoading={ordersQuery.isLoading}
             pageSize={5}
             pageSizeOptions={[5, 10]}
             onRowClick={(order) => navigate(`/ordenes-servicio/${order.id}`)}

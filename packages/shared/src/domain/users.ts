@@ -33,6 +33,14 @@ export const userListItemSchema = z.object({
 });
 export type UserListItem = z.infer<typeof userListItemSchema>;
 
+export const userOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  username: z.string(),
+  role: userRoleSchema,
+});
+export type UserOption = z.infer<typeof userOptionSchema>;
+
 export const createUserSchema = z.object({
   username: z
     .string()

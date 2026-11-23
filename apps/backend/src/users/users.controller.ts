@@ -15,6 +15,7 @@ import type {
   ResetPasswordInput,
   UpdateUserInput,
   UserListItem,
+  UserOption,
 } from '@turbopre/shared';
 import {
   createUserSchema,
@@ -38,6 +39,13 @@ export class UsersController {
   @ApiMessage('Usuarios del sistema')
   list(@Query('search') search?: string): Promise<UserListItem[]> {
     return this.usersService.list(search);
+  }
+
+  @Get('options')
+  @Roles('ADMIN', 'ENGINEER', 'PROJECT_MANAGER', 'WORKSHOP')
+  @ApiMessage('Usuarios para asignación')
+  options(@Query('roles') roles?: string): Promise<UserOption[]> {
+    return this.usersService.options(roles?.split(','));
   }
 
   @Post()

@@ -6,3 +6,6 @@ export * from './domain/permissions.js';
 export * from './domain/workflow.js';
 export * from './domain/users.js';
 export * from './domain/catalogs.js';
+export * from './domain/clients.js';
+export * from './domain/projects.js';
+export * from './domain/service-orders.js';

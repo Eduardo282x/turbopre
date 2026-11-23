@@ -12,15 +12,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { NewServiceOrderInput, Priority, ServiceOrder } from '@/features/preview/types';
+import { useClients, useEquipment, useProjects, useSites } from '@/hooks/use-commercial-data';
 import { toDateInputValue } from '@/lib/formatters';
+import type {
+  CreateServiceOrderInput,
+  Priority,
+  ServiceOrderRecord,
+} from '@turbopre/shared';
 
 interface ServiceOrderFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  order?: ServiceOrder;
-  onSubmit: (input: NewServiceOrderInput) => void;
+  order?: ServiceOrderRecord;
+  pending?: boolean;
+  onSubmit: (input: CreateServiceOrderInput) => void;
 }
 
 function defaultDueDate(): string {
@@ -29,77 +34,127 @@ function defaultDueDate(): string {
   return toDateInputValue(date);
 }
 
-export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: ServiceOrderFormDialogProps) {
-  const db = usePreviewStore((state) => state.db);
-  const [code, setCode] = useState('');
-  const [subCode, setSubCode] = useState('');
+const PRIORITIES: Array<{ value: Priority; label: string }> = [
+  { value: 'LOW', label: 'Baja' },
+  { value: 'MEDIUM', label: 'Media' },
+  { value: 'HIGH', label: 'Alta' },
+  { value: 'CRITICAL', label: 'Crítica' },
+];
+
+export function ServiceOrderFormDialog({
+  open,
+  onOpenChange,
+  order,
+  pending = false,
+  onSubmit,
+}: ServiceOrderFormDialogProps) {
+  const clientsQuery = useClients();
+  const sitesQuery = useSites();
+  const equipmentQuery = useEquipment();
+  const projectsQuery = useProjects();
+
   const [clientId, setClientId] = useState('');
-  const [assetId, setAssetId] = useState('');
-  const [equipmentCode, setEquipmentCode] = useState('');
+  const [siteId, setSiteId] = useState('');
+  const [equipmentId, setEquipmentId] = useState('');
   const [description, setDescription] = useState('');
   const [scope, setScope] = useState('');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [dueDate, setDueDate] = useState(defaultDueDate());
-  const [site, setSite] = useState('');
-  const [observations, setObservations] = useState('');
+  const [projectId, setProjectId] = useState('none');
+  const [notes, setNotes] = useState('');
+
+  const clients = clientsQuery.data ?? [];
+  const sites = sitesQuery.data ?? [];
+  const equipment = equipmentQuery.data ?? [];
+  const projects = projectsQuery.data ?? [];
+
+  const clientSites = sites.filter((site) => site.clientId === clientId);
+  const clientEquipment = equipment.filter((item) => item.clientId === clientId);
+  const clientProjects = projects.filter(
+    (project) => !project.clientId || project.clientId === clientId,
+  );
 
   useEffect(() => {
     if (!open) return;
-    const firstClient = db.clients[0];
-    const firstAsset = db.assets.find((asset) => asset.clientId === firstClient?.id) ?? db.assets[0];
-    setCode(order?.code ?? '');
-    setSubCode(order?.subCode ?? '');
-    setClientId(order?.clientId ?? firstClient?.id ?? '');
-    setAssetId(order?.assetId ?? firstAsset?.id ?? '');
-    setEquipmentCode(order?.equipmentCode ?? firstAsset?.tag ?? '');
-    setDescription(order?.description ?? '');
-    setScope(order?.scope ?? '');
-    setPriority(order?.priority ?? 'MEDIUM');
-    setDueDate(order ? toDateInputValue(order.dueDate) : defaultDueDate());
-    setSite(order?.site ?? (firstClient ? `Planta ${firstClient.name}` : ''));
-    setObservations(order?.observations ?? '');
-  }, [open, order, db.clients, db.assets]);
 
-  const clientAssets = db.assets.filter((asset) => !clientId || asset.clientId === clientId);
+    if (order) {
+      setClientId(order.client.id);
+      setSiteId(order.site.id);
+      setEquipmentId(order.equipment.id);
+      setDescription(order.description);
+      setScope(order.scope);
+      setPriority(order.priority);
+      setDueDate(order.dueAt ? toDateInputValue(order.dueAt) : defaultDueDate());
+      setProjectId(order.project?.id ?? 'none');
+      setNotes(order.notes ?? '');
+      return;
+    }
+
+    setClientId(clients[0]?.id ?? '');
+    setSiteId('');
+    setEquipmentId('');
+    setDescription('');
+    setScope('');
+    setPriority('MEDIUM');
+    setDueDate(defaultDueDate());
+    setProjectId('none');
+    setNotes('');
+  }, [open, order, clients]);
+
+  useEffect(() => {
+    if (!open || !clientId) return;
+    if (sitesQuery.isLoading || equipmentQuery.isLoading) return;
+
+    if (!clientSites.some((site) => site.id === siteId)) {
+      setSiteId(clientSites[0]?.id ?? '');
+    }
+
+    if (!clientEquipment.some((item) => item.id === equipmentId)) {
+      setEquipmentId(clientEquipment[0]?.id ?? '');
+    }
+  }, [
+    open,
+    clientId,
+    clientSites,
+    clientEquipment,
+    siteId,
+    equipmentId,
+    sitesQuery.isLoading,
+    equipmentQuery.isLoading,
+  ]);
 
   const handleClientChange = (nextClientId: string) => {
     setClientId(nextClientId);
-    const firstAsset = db.assets.find((asset) => asset.clientId === nextClientId);
-    if (firstAsset) {
-      setAssetId(firstAsset.id);
-      setEquipmentCode(firstAsset.tag);
-    }
-    const client = db.clients.find((candidate) => candidate.id === nextClientId);
-    if (client) setSite(`Planta ${client.name}`);
+    setSiteId(sites.find((site) => site.clientId === nextClientId)?.id ?? '');
+    setEquipmentId(
+      equipment.find((item) => item.clientId === nextClientId)?.id ?? '',
+    );
+    setProjectId('none');
   };
 
   const submit = () => {
-    if (!clientId || !assetId) {
-      toast.error('Selecciona el cliente y el equipo');
+    if (!clientId || !siteId || !equipmentId) {
+      toast.error('Selecciona el cliente, el sitio y el equipo');
       return;
     }
+
     if (!description.trim() || !scope.trim()) {
       toast.error('Completa la descripción y el alcance');
       return;
     }
-    if (!site.trim()) {
-      toast.error('Indica el sitio o planta');
-      return;
-    }
+
     onSubmit({
-      code: code.trim(),
-      subCode: subCode.trim(),
       clientId,
-      assetId,
-      equipmentCode: equipmentCode.trim(),
+      siteId,
+      equipmentId,
       description: description.trim(),
       scope: scope.trim(),
       priority,
-      dueDate: new Date(`${dueDate}T12:00:00`).toISOString(),
-      site: site.trim(),
-      observations: observations.trim() || undefined,
+      dueAt: dueDate ? new Date(`${dueDate}T12:00:00`).toISOString() : null,
+      projectId: projectId === 'none' ? null : projectId,
+      parentServiceOrderId: null,
+      notes: notes.trim() || null,
     });
-    onOpenChange(false);
   };
 
   return (
@@ -114,8 +169,8 @@ export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: 
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="button" onClick={submit}>
-            {order ? 'Guardar cambios' : 'Crear orden de servicio'}
+          <Button type="button" onClick={submit} disabled={pending}>
+            {pending ? 'Guardando…' : order ? 'Guardar cambios' : 'Crear orden de servicio'}
           </Button>
         </>
       }
@@ -123,31 +178,13 @@ export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: 
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="ods-code">ODS principal</FieldLabel>
-            <Input
-              id="ods-code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Ej: 510000001915"
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="ods-subcode">Sub-ODS</FieldLabel>
-            <Input
-              id="ods-subcode"
-              value={subCode}
-              onChange={(event) => setSubCode(event.target.value)}
-              placeholder="Ej: 520000001658"
-            />
-          </Field>
-          <Field>
             <FieldLabel>Cliente / empresa</FieldLabel>
             <Select value={clientId} onValueChange={handleClientChange}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona un cliente" />
               </SelectTrigger>
               <SelectContent>
-                {db.clients.map((client) => (
+                {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
                   </SelectItem>
@@ -155,37 +192,56 @@ export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: 
               </SelectContent>
             </Select>
           </Field>
+
           <Field>
-            <FieldLabel>Equipo</FieldLabel>
-            <Select
-              value={assetId}
-              onValueChange={(value) => {
-                setAssetId(value);
-                const asset = db.assets.find((candidate) => candidate.id === value);
-                if (asset) setEquipmentCode(asset.tag);
-              }}
-            >
+            <FieldLabel>Sitio / planta</FieldLabel>
+            <Select value={siteId} onValueChange={setSiteId}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona un equipo" />
+                <SelectValue placeholder="Selecciona un sitio" />
               </SelectTrigger>
               <SelectContent>
-                {(clientAssets.length > 0 ? clientAssets : db.assets).map((asset) => (
-                  <SelectItem key={asset.id} value={asset.id}>
-                    {asset.manufacturer} {asset.model} · {asset.tag}
+                {clientSites.map((site) => (
+                  <SelectItem key={site.id} value={site.id}>
+                    {site.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </Field>
+
           <Field>
-            <FieldLabel htmlFor="equipment-code">Código del equipo</FieldLabel>
-            <Input
-              id="equipment-code"
-              value={equipmentCode}
-              onChange={(event) => setEquipmentCode(event.target.value)}
-              placeholder="Ej: TV-NG-500RC"
-            />
+            <FieldLabel>Equipo</FieldLabel>
+            <Select value={equipmentId} onValueChange={setEquipmentId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona un equipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {clientEquipment.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.code} · {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
+
+          <Field>
+            <FieldLabel>Proyecto (opcional)</FieldLabel>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin proyecto</SelectItem>
+                {clientProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.code} · {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
           <Field>
             <FieldLabel>Prioridad</FieldLabel>
             <Select value={priority} onValueChange={(value) => setPriority(value as Priority)}>
@@ -193,17 +249,15 @@ export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="LOW">Baja</SelectItem>
-                <SelectItem value="MEDIUM">Media</SelectItem>
-                <SelectItem value="HIGH">Alta</SelectItem>
-                <SelectItem value="CRITICAL">Crítica</SelectItem>
+                {PRIORITIES.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="ods-site">Sitio / planta</FieldLabel>
-            <Input id="ods-site" value={site} onChange={(event) => setSite(event.target.value)} />
-          </Field>
+
           <Field>
             <FieldLabel htmlFor="ods-due">Fecha compromiso</FieldLabel>
             <Input
@@ -242,13 +296,25 @@ export function ServiceOrderFormDialog({ open, onOpenChange, order, onSubmit }: 
           <Textarea
             id="ods-observations"
             rows={2}
-            value={observations}
-            onChange={(event) => setObservations(event.target.value)}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
           />
         </Field>
 
+        {clientId && clientSites.length === 0 && (
+          <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-muted-foreground">
+            Este cliente no tiene sitios registrados. Crea uno desde Clientes → Sitios.
+          </p>
+        )}
+
+        {clientId && clientEquipment.length === 0 && (
+          <p className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-muted-foreground">
+            Este cliente no tiene equipos registrados. Crea uno desde Clientes → Equipos.
+          </p>
+        )}
+
         <p className="rounded-lg border border-info/30 bg-info/5 px-3 py-2 text-[11px] text-muted-foreground">
-          Si dejas los códigos vacíos, CAMI generará un ODS principal y un sub-ODS automáticamente.
+          El número de ODS lo genera el sistema al guardar.
         </p>
       </div>
     </FormDialog>

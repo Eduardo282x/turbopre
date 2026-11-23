@@ -13,7 +13,7 @@ const SUBTITLES: Record<string, string> = {
   '/taller': 'Inspecciones, procesos de taller y carga de trabajo por puesto.',
   '/taller/inspecciones': 'Inspecciones creadas desde la ODS y tareas por proceso, puesto y etapa.',
   '/taller/repuestos': 'Solicitudes multi-línea: Almacén o Procura según disponibilidad.',
-  '/proyectos': 'Cartera de proyectos de ingeniería y su avance por hitos.',
+  '/proyectos': 'Cartera de proyectos de ingeniería y su avance por ODS.',
   '/almacen/inventario': 'Existencias, ubicaciones y disponibilidad.',
   '/almacen/solicitudes': 'Solicitudes de taller por despachar o recibir de Procura.',
   '/almacen/prestamos': 'Entregas y devoluciones de herramientas.',

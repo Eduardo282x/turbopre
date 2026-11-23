@@ -4,6 +4,7 @@ import type {
   ResetPasswordInput,
   UpdateUserInput,
   UserListItem,
+  UserOption,
 } from '@turbopre/shared';
 import { api } from '../api';
 
@@ -11,6 +12,13 @@ export const usersService = {
   async list(search?: string): Promise<UserListItem[]> {
     const { data } = await api.get<ApiSuccess<UserListItem[]>>('/users', {
       params: search ? { search } : undefined,
+    });
+    return data.data;
+  },
+
+  async options(roles?: string[]): Promise<UserOption[]> {
+    const { data } = await api.get<ApiSuccess<UserOption[]>>('/users/options', {
+      params: roles && roles.length > 0 ? { roles: roles.join(',') } : undefined,
     });
     return data.data;
   },

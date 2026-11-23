@@ -39,7 +39,8 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 | `admin` | `admin1234` |
 
 > El administrador y los catálogos se crean con `pnpm db:seed`. En desarrollo
-> también se crean usuarios demo (uno por rol) con contraseña `demo1234`; en
+> también se crean usuarios demo (uno por rol) con contraseña `demo1234` y datos
+> comerciales de ejemplo (clientes, sitios, equipos, proyectos y ODS). En
 > producción se omiten salvo que definas `SEED_DEMO_USERS=true`. El login
 > siempre valida contra PostgreSQL.
 
@@ -69,6 +70,19 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 | `POST` | `/api/users/:id/password` | Restablece la contraseña. Solo `ADMIN`. |
 | `GET` | `/api/catalogs` | Departamentos, procesos, puestos y ubicaciones. Cualquier usuario autenticado. |
 | `POST/PATCH` | `/api/catalogs/...` | Altas y ediciones de catálogos. Solo `ADMIN`. |
+| `GET` | `/api/clients` / `/api/clients/:id` | Clientes con conteos de sitios, equipos y ODS. |
+| `POST/PATCH` | `/api/clients/...` | Altas y ediciones de clientes. `ADMIN` y `SALES`. |
+| `GET` | `/api/sites` | Sitios/plantas; admite `?clientId=` y `?search=`. |
+| `POST/PATCH` | `/api/sites/...` | Altas y ediciones de sitios. `ADMIN` y `SALES`. |
+| `GET` | `/api/equipment` | Equipos; admite `?clientId=` y `?search=`. |
+| `POST/PATCH` | `/api/equipment/...` | Altas y ediciones de equipos. `ADMIN` y `SALES`. |
+| `GET` | `/api/projects` | Proyectos con avance derivado de sus ODS. `ADMIN`, `ENGINEER`, `PROJECT_MANAGER`. |
+| `POST/PATCH` | `/api/projects/...` | Altas y ediciones de proyectos. `ADMIN` y `ENGINEER`. |
+| `GET` | `/api/service-orders` / `/api/service-orders/:id` | ODS con cliente, sitio, equipo, proyecto, estado visible y avance. |
+| `POST/PATCH` | `/api/service-orders/...` | Crear y editar ODS. `ADMIN` y `SALES`. |
+| `POST` | `/api/service-orders/:id/cancel` | Cancelar una ODS. `ADMIN` y `SALES`. |
+| `POST` | `/api/service-orders/:id/deliver` | Confirmar entrega de una ODS lista. `ADMIN` y `SALES`. |
+| `GET` | `/api/users/options` | Opciones de usuario para asignaciones (responsables, tareas). |
 
 ### Formato de respuesta
 

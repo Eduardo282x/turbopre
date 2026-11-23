@@ -58,6 +58,18 @@ export function canManageClients(role: UserRole): boolean {
   return hasAnyRole(role, ['ADMIN', 'SALES']);
 }
 
+export function canViewClients(role: UserRole): boolean {
+  return hasAnyRole(role, ['ADMIN', 'SALES', 'WORKSHOP', 'ENGINEER', 'PROJECT_MANAGER']);
+}
+
+export function canManageSites(role: UserRole): boolean {
+  return hasAnyRole(role, ['ADMIN', 'SALES']);
+}
+
+export function canManageEquipment(role: UserRole): boolean {
+  return hasAnyRole(role, ['ADMIN', 'SALES']);
+}
+
 export function canCreateInspection(role: UserRole): boolean {
   return hasAnyRole(role, ['ADMIN', 'WORKSHOP']);
 }
@@ -149,6 +161,10 @@ export function canManageCalibration(role: UserRole): boolean {
 
 export function canManageProjects(role: UserRole): boolean {
   return hasAnyRole(role, ['ADMIN', 'ENGINEER']);
+}
+
+export function canViewProjects(role: UserRole): boolean {
+  return hasAnyRole(role, ['ADMIN', 'ENGINEER', 'PROJECT_MANAGER']);
 }
 
 export function canViewPerformance(role: UserRole): boolean {

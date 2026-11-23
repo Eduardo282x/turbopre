@@ -85,10 +85,11 @@ Deseable a futuro (nada de esto está implementado todavía):
 - Prisma 7 con el modelo de dominio completo en `apps/backend/prisma/schema.prisma`;
   la documentación funcional y los diagramas están en `docs/domain-model.md`.
 - Deploy de QA preparado: `apps/frontend/vercel.json` y `render.yaml`.
-- **Conectado**: login, sesión JWT, `/auth/me`, usuarios y catálogos.
-- **Pendiente**: migrar los módulos de negocio (ODS, inspecciones, hojas,
-  tareas, almacén, proyectos, analítica) del preview en `localStorage` a la API,
-  fase por fase.
+- **Conectado**: login, sesión JWT, `/auth/me`, usuarios, catálogos, clientes,
+  sitios, equipos, proyectos y órdenes de servicio.
+- **Pendiente**: migrar inspecciones, tareas, hojas de ruta, anexos, calidad,
+  almacén, planta, analítica y auditoría desde el preview en `localStorage` a la
+  API, fase por fase.
 
 ## 6. Antes de implementar dominio: pregunta
 

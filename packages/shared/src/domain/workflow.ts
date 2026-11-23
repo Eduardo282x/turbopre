@@ -169,5 +169,7 @@ export function deriveServiceOrderWorkflowStatus(
   if (input.inspectionStatus === 'APPROVED') return 'INSPECTION_APPROVED';
   if (input.inspectionStatus) return 'IN_INSPECTION';
 
+  if (input.status === 'IN_PROGRESS') return 'IN_EXECUTION';
+
   return 'RECEIVED';
 }

@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
   CheckCircle2,
@@ -16,7 +17,6 @@ import { DonutChart } from '@/components/charts/donut-chart';
 import { SimpleBarChart } from '@/components/charts/simple-bar-chart';
 import {
   PriorityBadge,
-  RouteStatusBadge,
   ServiceOrderStatusBadge,
 } from '@/components/common/badges';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -27,62 +27,132 @@ import { SectionCard } from '@/components/common/section-card';
 import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
 import { Button } from '@/components/ui/button';
-import {
-  getClientVolumeData,
-  getRouteSheetsWithRelations,
-  getSalesStatusData,
-  getServiceOrderMetrics,
-  getServiceOrdersWithRelations,
-} from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type {
-  NewServiceOrderInput,
-  RouteSheetWithRelations,
-  ServiceOrderWithRelations,
-} from '@/features/preview/types';
+import { useServiceOrders } from '@/hooks/use-commercial-data';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/formatters';
-import { canDeliverRoute, canManageServiceOrders } from '@/lib/permissions';
+import { canManageServiceOrders } from '@/lib/permissions';
+import type { CreateServiceOrderInput, ServiceOrderRecord } from '@turbopre/shared';
+import { serviceOrdersService } from '@/services/service-orders/service-orders.service';
 import { ServiceOrderFormDialog } from '@/pages/service-orders/service-order-form-dialog';
+
+const SALES_STATUS = [
+  { name: 'Recibidas', color: '#64748b', matches: ['RECEIVED'] },
+  { name: 'En inspección', color: '#38bdf8', matches: ['IN_INSPECTION'] },
+  { name: 'En hoja de ruta', color: '#a78bfa', matches: ['INSPECTION_APPROVED', 'IN_ROUTE'] },
+  { name: 'En ejecución', color: '#00d1ff', matches: ['IN_EXECUTION'] },
+  { name: 'En calidad', color: '#ffb020', matches: ['IN_ANNEXES', 'IN_QUALITY'] },
+  { name: 'Por entregar', color: '#22c55e', matches: ['READY_FOR_DELIVERY'] },
+  { name: 'Entregadas', color: '#3b82f6', matches: ['DELIVERED'] },
+] as const;
 
 export function SalesDashboardPage() {
   const user = useCurrentUser();
-  const db = usePreviewStore((state) => state.db);
-  const createServiceOrder = usePreviewStore((state) => state.createServiceOrder);
-  const deliverRouteSheet = usePreviewStore((state) => state.deliverRouteSheet);
+  const queryClient = useQueryClient();
+  const ordersQuery = useServiceOrders();
   const navigate = useNavigate();
   const [formOpen, setFormOpen] = useState(false);
-  const [delivering, setDelivering] = useState<RouteSheetWithRelations | null>(null);
+  const [delivering, setDelivering] = useState<ServiceOrderRecord | null>(null);
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+    void queryClient.invalidateQueries({ queryKey: ['clients'] });
+    void queryClient.invalidateQueries({ queryKey: ['projects'] });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (input: CreateServiceOrderInput) => serviceOrdersService.create(input),
+    onSuccess: (order) => {
+      invalidate();
+      toast.success('Orden de servicio creada y enviada a taller e ingeniería', {
+        description: order.orderNumber,
+      });
+      setFormOpen(false);
+      navigate(`/ordenes-servicio/${order.id}`);
+    },
+    onError: (error) =>
+      toast.error('No se pudo crear la orden de servicio', {
+        description: getApiErrorMessage(error),
+      }),
+  });
+
+  const deliverMutation = useMutation({
+    mutationFn: (id: string) => serviceOrdersService.deliver(id),
+    onSuccess: (order) => {
+      invalidate();
+      toast.success('Entrega registrada', { description: order.orderNumber });
+      setDelivering(null);
+    },
+    onError: (error) =>
+      toast.error('No se pudo registrar la entrega', {
+        description: getApiErrorMessage(error),
+      }),
+  });
 
   if (!user) return null;
 
-  const orders = getServiceOrdersWithRelations(db);
-  const routes = getRouteSheetsWithRelations(db);
-  const metrics = getServiceOrderMetrics(db);
-  const topClients = getClientVolumeData(db);
-  const salesStatus = getSalesStatusData(db);
-  const ready = routes.filter((route) => route.status === 'READY_FOR_DELIVERY');
+  const orders = ordersQuery.data ?? [];
+  const ready = orders.filter((order) => order.status === 'READY_FOR_DELIVERY');
+  const metrics = {
+    total: orders.length,
+    inInspection: orders.filter((order) => order.workflowStatus === 'IN_INSPECTION').length,
+    inExecution: orders.filter((order) => order.workflowStatus === 'IN_EXECUTION').length,
+    readyForDelivery: ready.length,
+    delivered: orders.filter((order) => order.workflowStatus === 'DELIVERED').length,
+  };
 
-  const columns: DataTableColumn<ServiceOrderWithRelations>[] = [
+  const salesStatus = SALES_STATUS.map((status) => ({
+    name: status.name,
+    color: status.color,
+    value: orders.filter((order) =>
+      (status.matches as readonly string[]).includes(order.workflowStatus),
+    ).length,
+  }));
+
+  const topClients = Object.values(
+    orders.reduce<Record<string, { clientId: string; name: string; value: number }>>(
+      (accumulator, order) => {
+        const current = accumulator[order.client.id] ?? {
+          clientId: order.client.id,
+          name: order.client.name,
+          value: 0,
+        };
+        current.value += 1;
+        accumulator[order.client.id] = current;
+        return accumulator;
+      },
+      {},
+    ),
+  )
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+
+  const columns: DataTableColumn<ServiceOrderRecord>[] = [
     {
       id: 'order',
       header: 'Orden de servicio',
       cell: (order) => (
         <div className="min-w-0">
-          <p className="font-semibold text-foreground">{order.code}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">Sub-ODS: {order.subCode}</p>
+          <p className="font-semibold text-foreground">{order.orderNumber}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {order.parentOrderNumber
+              ? `Sub-ODS de ${order.parentOrderNumber}`
+              : 'ODS principal'}
+          </p>
         </div>
       ),
       sortable: true,
-      sortValue: (order) => order.code,
+      sortValue: (order) => order.orderNumber,
     },
     {
       id: 'client',
       header: 'Cliente / equipo',
       cell: (order) => (
         <div className="text-xs">
-          <p className="font-medium text-foreground">{order.client?.name ?? '—'}</p>
-          <p className="text-muted-foreground">{order.asset?.manufacturer} {order.asset?.model}</p>
+          <p className="font-medium text-foreground">{order.client.name}</p>
+          <p className="text-muted-foreground">
+            {order.equipment.code} · {order.equipment.name}
+          </p>
         </div>
       ),
       hideOnMobile: true,
@@ -90,7 +160,7 @@ export function SalesDashboardPage() {
     {
       id: 'status',
       header: 'Estado',
-      cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
+      cell: (order) => <ServiceOrderStatusBadge status={order.workflowStatus} />,
     },
     {
       id: 'priority',
@@ -107,7 +177,11 @@ export function SalesDashboardPage() {
     {
       id: 'due',
       header: 'Entrega',
-      cell: (order) => <span className="text-xs text-muted-foreground">{formatDate(order.dueDate)}</span>,
+      cell: (order) => (
+        <span className="text-xs text-muted-foreground">
+          {order.dueAt ? formatDate(order.dueAt) : 'Sin fecha'}
+        </span>
+      ),
       hideOnMobile: true,
     },
   ];
@@ -135,10 +209,34 @@ export function SalesDashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Órdenes totales" value={metrics.total} hint="Recibidas por Ventas" icon={ClipboardList} tone="accent" />
-        <KpiCard label="En inspección" value={metrics.inInspection} hint="Taller está evaluando" icon={ShoppingCart} tone="info" />
-        <KpiCard label="En ejecución" value={metrics.inExecution} hint="Hojas liberadas" icon={Truck} tone="warning" />
-        <KpiCard label="Por entregar" value={ready.length} hint="Listas para el cliente" icon={Package} tone="success" />
+        <KpiCard
+          label="Órdenes totales"
+          value={metrics.total}
+          hint="Recibidas por Ventas"
+          icon={ClipboardList}
+          tone="accent"
+        />
+        <KpiCard
+          label="En inspección"
+          value={metrics.inInspection}
+          hint="Taller está evaluando"
+          icon={ShoppingCart}
+          tone="info"
+        />
+        <KpiCard
+          label="En ejecución"
+          value={metrics.inExecution}
+          hint="Hojas liberadas"
+          icon={Truck}
+          tone="warning"
+        />
+        <KpiCard
+          label="Por entregar"
+          value={metrics.readyForDelivery}
+          hint="Listas para el cliente"
+          icon={Package}
+          tone="success"
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -156,30 +254,33 @@ export function SalesDashboardPage() {
       </div>
 
       {ready.length > 0 && (
-        <SectionCard title="Listas para entregar" description="Hojas aprobadas por Calidad. Ventas confirma la entrega.">
+        <SectionCard
+          title="Listas para entregar"
+          description="ODS pendientes de confirmación de entrega por Ventas."
+        >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {ready.map((route) => (
-              <div key={route.id} className="rounded-xl border border-border/70 p-3">
+            {ready.map((order) => (
+              <div key={order.id} className="rounded-xl border border-border/70 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-foreground">{route.code}</p>
+                    <p className="font-semibold text-foreground">{order.orderNumber}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {route.client?.name} · {route.asset?.model}
+                      {order.client.name} · {order.equipment.name}
                     </p>
                   </div>
-                  <RouteStatusBadge status={route.status} />
+                  <ServiceOrderStatusBadge status={order.workflowStatus} />
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Entrega comprometida: {formatDate(route.dueDate)}
+                  Entrega comprometida: {order.dueAt ? formatDate(order.dueAt) : 'Sin fecha'}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <Button variant="outline" size="sm" asChild className="flex-1">
-                    <Link to={`/hojas-de-ruta/${route.id}`}>
+                    <Link to={`/ordenes-servicio/${order.id}`}>
                       <Eye /> Ver
                     </Link>
                   </Button>
-                  {canDeliverRoute(user, route) && (
-                    <Button size="sm" onClick={() => setDelivering(route)}>
+                  {canManageServiceOrders(user) && (
+                    <Button size="sm" onClick={() => setDelivering(order)}>
                       <Package /> Entregar
                     </Button>
                   )}
@@ -190,15 +291,20 @@ export function SalesDashboardPage() {
         </SectionCard>
       )}
 
-      <SectionCard title="Órdenes de servicio" description="Seguimiento comercial de todas las ODS." contentClassName="p-0">
+      <SectionCard
+        title="Órdenes de servicio"
+        description="Seguimiento comercial de todas las ODS."
+        contentClassName="p-0"
+      >
         <DataTable
           data={orders}
           columns={columns}
           getRowId={(order) => order.id}
+          isLoading={ordersQuery.isLoading}
           search={{
             placeholder: 'Buscar por ODS, cliente, equipo o descripción…',
             getText: (order) =>
-              `${order.code} ${order.subCode} ${order.client?.name ?? ''} ${order.asset?.model ?? ''} ${order.description}`,
+              `${order.orderNumber} ${order.client.name} ${order.equipment.code} ${order.equipment.name} ${order.description}`,
           }}
           onRowClick={(order) => navigate(`/ordenes-servicio/${order.id}`)}
           pageSize={10}
@@ -218,11 +324,8 @@ export function SalesDashboardPage() {
       <ServiceOrderFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSubmit={(input: NewServiceOrderInput) => {
-          const id = createServiceOrder(input, user.id);
-          toast.success('Orden de servicio creada y enviada a taller e ingeniería');
-          navigate(`/ordenes-servicio/${id}`);
-        }}
+        pending={createMutation.isPending}
+        onSubmit={(input) => createMutation.mutate(input)}
       />
 
       <ConfirmDialog
@@ -231,13 +334,11 @@ export function SalesDashboardPage() {
           if (!open) setDelivering(null);
         }}
         title="Confirmar entrega"
-        description={`¿Confirmas la entrega de ${delivering?.code ?? 'la hoja'} al cliente ${delivering?.client?.name ?? ''}?`}
+        description={`¿Confirmas la entrega de ${delivering?.orderNumber ?? 'la ODS'} al cliente ${delivering?.client.name ?? ''}?`}
         confirmLabel="Sí, entregar"
         onConfirm={() => {
           if (!delivering) return;
-          deliverRouteSheet(delivering.id, user.id);
-          toast.success(`${delivering.code} entregada`);
-          setDelivering(null);
+          deliverMutation.mutate(delivering.id);
         }}
       />
     </div>

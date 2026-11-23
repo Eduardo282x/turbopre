@@ -81,13 +81,17 @@ src/
   login real con los usuarios sembrados (`demo1234`). En producción no aparecen
   (ver `isPreviewMode`).
 
-## Estado de la migración (Fase 1)
+## Estado de la migración (Fase 2)
 
-- **Conectado a la API**: login, `/auth/me`, sesión, usuarios y catálogos.
+- **Conectado a la API**: login, `/auth/me`, sesión, usuarios, catálogos,
+  clientes, sitios, equipos, proyectos y órdenes de servicio.
 - **Sigue en preview** (`src/features/preview/`, zustand + `localStorage`):
-  órdenes de servicio, inspecciones, hojas de ruta, tareas, repuestos,
-  proyectos, inventario, solicitudes, préstamos, calibración, rendimiento,
-  mapa de planta, auditoría y configuración de datos demo.
+  inspecciones, tareas, hojas de ruta, anexos, calidad, repuestos, inventario,
+  solicitudes, préstamos, calibración, rendimiento, mapa de planta, auditoría y
+  datos demo de configuración.
+- Mientras inspección/hoja sigan en preview, `useServiceOrders` mezcla el estado
+  y avance de la semilla preview para las ODS demo con IDs estables. Las ODS
+  nuevas usan exclusivamente la API.
 - Los roles son los canónicos del backend: Administrador (`ADMIN`), Ventas,
   Taller, Ingeniería (`ENGINEER`), Operador, Calidad, Gerente de Proyecto
   (`PROJECT_MANAGER`) y Almacén.

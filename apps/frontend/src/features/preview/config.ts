@@ -238,6 +238,28 @@ export const PROJECT_PHASE_META: Record<ProjectPhase, { label: string; tone: Ton
   CLOSED: { label: 'Cerrado', tone: 'neutral' },
 };
 
+export const PROJECT_STATUS_META: Record<
+  'PLANNED' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED',
+  { label: string; tone: Tone }
+> = {
+  PLANNED: { label: 'Planificado', tone: 'neutral' },
+  ACTIVE: { label: 'Activo', tone: 'accent' },
+  ON_HOLD: { label: 'En pausa', tone: 'warning' },
+  COMPLETED: { label: 'Completado', tone: 'success' },
+  CANCELLED: { label: 'Cancelado', tone: 'danger' },
+};
+
+export const EQUIPMENT_TYPE_META: Record<
+  'GAS_TURBINE' | 'STEAM_TURBINE' | 'GENERATOR' | 'COMPRESSOR' | 'AUXILIARY',
+  { label: string; shortLabel: string }
+> = {
+  GAS_TURBINE: { label: 'Turbina a gas', shortLabel: 'T. Gas' },
+  STEAM_TURBINE: { label: 'Turbina a vapor', shortLabel: 'T. Vapor' },
+  GENERATOR: { label: 'Generador eléctrico', shortLabel: 'Generador' },
+  COMPRESSOR: { label: 'Compresor', shortLabel: 'Compresor' },
+  AUXILIARY: { label: 'Equipo auxiliar', shortLabel: 'Auxiliar' },
+};
+
 export const CALIBRATION_STATUS_META: Record<
   'VALID' | 'DUE_SOON' | 'EXPIRED' | 'NONE',
   { label: string; tone: Tone }

@@ -56,11 +56,6 @@ export function AppHeader({ collapsed, onToggleCollapse }: AppHeaderProps) {
           <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] font-semibold text-primary">
             CAMI
           </Badge>
-          {isPreviewMode && (
-            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-              Demo
-            </Badge>
-          )}
         </div>
         <p className="hidden truncate text-xs text-muted-foreground sm:block">{subtitle}</p>
       </div>

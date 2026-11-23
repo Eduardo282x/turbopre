@@ -10,7 +10,9 @@ import type {
   ResetPasswordInput,
   UpdateUserInput,
   UserListItem,
+  UserOption,
 } from '@turbopre/shared';
+import { USER_ROLES } from '@turbopre/shared';
 import { Prisma, type UserRole } from '../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -54,8 +56,7 @@ export class UsersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(search?: string): Promise<UserListItem[]> {
-    const term = search?.trim();
+  async list(search?: string): Promise<UserListItem[]> {    const term = search?.trim();
     const where: Prisma.UserWhereInput = term
       ? {
           OR: [
@@ -73,6 +74,33 @@ export class UsersService {
     });
 
     return users.map((user) => this.toListItem(user));
+  }
+
+  async options(roles?: string[]): Promise<UserOption[]> {
+    const validRoles = roles
+      ?.map((role) => role.trim().toUpperCase())
+      .filter((role): role is UserRole => USER_ROLES.includes(role as UserRole));
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        ...(validRoles && validRoles.length > 0 ? { role: { in: validRoles } } : {}),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        role: true,
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      name: user.fullName,
+      username: user.username,
+      role: user.role,
+    }));
   }
 
   async create(input: CreateUserInput, actorId: string): Promise<UserListItem> {

@@ -12,45 +12,51 @@ import type { DataTableColumn } from '@/components/table-kit/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   getRouteSheetsWithRelations,
-  getServiceOrdersWithRelations,
 } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { RouteSheetWithRelations, ServiceOrderWithRelations } from '@/features/preview/types';
+import { useServiceOrders } from '@/hooks/use-commercial-data';
+import type { RouteSheetWithRelations } from '@/features/preview/types';
+import type { ServiceOrderRecord } from '@turbopre/shared';
 import { formatDate, formatDateTime } from '@/lib/formatters';
 
 export function HistoryPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
+  const ordersQuery = useServiceOrders();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const canSeeOds = user?.role === 'ADMIN' || user?.role === 'SALES';
   const [tab, setTab] = useState(params.get('tab') === 'ods' || (user?.role === 'SALES') ? 'ods' : 'rutas');
 
-  const orders = getServiceOrdersWithRelations(db);
+  const orders = ordersQuery.data ?? [];
   const routes = getRouteSheetsWithRelations(db);
-  const odsColumns: DataTableColumn<ServiceOrderWithRelations>[] = useMemo(
+  const odsColumns: DataTableColumn<ServiceOrderRecord>[] = useMemo(
     () => [
       {
         id: 'code',
         header: 'Orden de servicio',
         cell: (order) => (
           <div className="min-w-0">
-            <p className="font-semibold text-foreground">{order.code}</p>
-            <p className="font-mono text-[11px] text-muted-foreground">Sub-ODS: {order.subCode}</p>
+            <p className="font-semibold text-foreground">{order.orderNumber}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {order.parentOrderNumber
+                ? `Sub-ODS de ${order.parentOrderNumber}`
+                : 'ODS principal'}
+            </p>
           </div>
         ),
         sortable: true,
-        sortValue: (order) => order.code,
+        sortValue: (order) => order.orderNumber,
       },
       {
         id: 'client',
         header: 'Cliente / equipo',
         cell: (order) => (
           <div className="text-xs">
-            <p className="font-medium text-foreground">{order.client?.name ?? '—'}</p>
+            <p className="font-medium text-foreground">{order.client.name}</p>
             <p className="text-muted-foreground">
-              {order.asset?.manufacturer} {order.asset?.model} · {order.equipmentCode}
+              {order.equipment.code} · {order.equipment.name}
             </p>
           </div>
         ),
@@ -60,24 +66,28 @@ export function HistoryPage() {
         id: 'description',
         header: 'Descripción',
         cell: (order) => (
-          <span className="block max-w-80 truncate text-xs text-muted-foreground">{order.description}</span>
+          <span className="block max-w-80 truncate text-xs text-muted-foreground">
+            {order.description}
+          </span>
         ),
         hideOnMobile: true,
       },
       {
         id: 'status',
         header: 'Estado',
-        cell: (order) => <ServiceOrderStatusBadge status={order.status} />,
+        cell: (order) => <ServiceOrderStatusBadge status={order.workflowStatus} />,
         sortable: true,
-        sortValue: (order) => order.status,
+        sortValue: (order) => order.workflowStatus,
       },
       {
         id: 'created',
         header: 'Creada',
-        cell: (order) => <span className="text-xs text-muted-foreground">{formatDate(order.createdAt)}</span>,
+        cell: (order) => (
+          <span className="text-xs text-muted-foreground">{formatDate(order.requestedAt)}</span>
+        ),
         hideOnMobile: true,
         sortable: true,
-        sortValue: (order) => new Date(order.createdAt),
+        sortValue: (order) => new Date(order.requestedAt),
       },
       {
         id: 'progress',
@@ -195,10 +205,11 @@ export function HistoryPage() {
               data={orders}
               columns={odsColumns}
               getRowId={(order) => order.id}
+              isLoading={ordersQuery.isLoading}
               search={{
                 placeholder: 'Buscar por ODS, cliente, equipo o descripción…',
                 getText: (order) =>
-                  `${order.code} ${order.subCode} ${order.client?.name ?? ''} ${order.asset?.model ?? ''} ${order.description}`,
+                  `${order.orderNumber} ${order.client.name} ${order.equipment.code} ${order.equipment.name} ${order.description}`,
               }}
               onRowClick={(order) => navigate(`/ordenes-servicio/${order.id}`)}
               pageSize={12}

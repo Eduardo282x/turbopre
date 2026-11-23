@@ -1,6 +1,8 @@
 import { StatusBadge } from '@/components/common/status-badge';
+import type { EquipmentType, ProjectStatus, ServiceOrderWorkflowStatus } from '@turbopre/shared';
 import {
   CALIBRATION_STATUS_META,
+  EQUIPMENT_TYPE_META,
   INSPECTION_STATUS_META,
   INVENTORY_STATUS_META,
   LOAN_STATUS_META,
@@ -8,6 +10,7 @@ import {
   PRIORITY_META,
   PROCESS_BY_ID,
   PROJECT_PHASE_META,
+  PROJECT_STATUS_META,
   ROUTE_STATUS_META,
   SERVICE_ORDER_STATUS_META,
   SPARE_DESTINATION_META,
@@ -23,7 +26,6 @@ import type {
   ProcessId,
   ProjectPhase,
   RouteStatus,
-  ServiceOrderStatus,
   SpareDestination,
   SpareItemStatus,
   TaskStatus,
@@ -52,7 +54,7 @@ export function InspectionStatusBadge({ status }: { status: InspectionStatus }) 
   );
 }
 
-export function ServiceOrderStatusBadge({ status }: { status: ServiceOrderStatus }) {
+export function ServiceOrderStatusBadge({ status }: { status: ServiceOrderWorkflowStatus }) {
   const meta = SERVICE_ORDER_STATUS_META[status];
   return (
     <StatusBadge tone={meta.tone} dot>
@@ -89,6 +91,16 @@ export function InventoryStatusBadge({ status }: { status: InventoryStatus }) {
 export function ProjectPhaseBadge({ phase }: { phase: ProjectPhase }) {
   const meta = PROJECT_PHASE_META[phase];
   return <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>;
+}
+
+export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
+  const meta = PROJECT_STATUS_META[status];
+  return <StatusBadge tone={meta.tone}>{meta.label}</StatusBadge>;
+}
+
+export function EquipmentTypeBadge({ type }: { type: EquipmentType }) {
+  const meta = EQUIPMENT_TYPE_META[type];
+  return <StatusBadge tone="neutral">{meta.shortLabel}</StatusBadge>;
 }
 
 export function CalibrationStatusBadge({
