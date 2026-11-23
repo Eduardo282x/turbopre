@@ -10,9 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { ROLE_OPTIONS, getRoleLabel } from '@/features/preview/config';
-import { DEMO_PASSWORD } from '@/features/preview/data/seed';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { getRoleLabel } from '@/features/preview/config';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { authService } from '@/services/auth/auth.service';
 import { useAuthStore } from '@/stores/use-auth-store';
@@ -23,7 +21,6 @@ const CURRENT_YEAR = new Date().getFullYear();
 export function LoginPage() {
   const currentUser = useAuthStore((state) => state.user);
   const signIn = useAuthStore((state) => state.signIn);
-  const users = usePreviewStore((state) => state.db.users);
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
