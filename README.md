@@ -152,7 +152,7 @@ apps/backend/src/
 ├─ common/         filtro global de excepciones y decoradores
 ├─ interceptors/   sobre estándar de respuestas exitosas
 ├─ health/         GET /api/health
-└─ prisma/         PrismaService (inicialización perezosa) y módulo global
+└─ prisma/         PrismaService (pool de pg, conexión al arranque) y módulo global
 ```
 
 La validación usa `StandardSchemaValidationPipe` de Nest 12 con los esquemas zod de

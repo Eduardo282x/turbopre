@@ -5,8 +5,8 @@ import { PrismaClient } from '../generated/prisma/client.js';
 import { Pool, PoolConfig } from 'pg';
 
 /**
- * Cliente Prisma con inicialización perezosa: la aplicación arranca aunque la
- * base de datos todavía no esté configurada (modo demo del login).
+ * Cliente Prisma con pool de conexiones de `pg`.
+ * La conexión se valida al arrancar la aplicación (`onModuleInit`).
  */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {

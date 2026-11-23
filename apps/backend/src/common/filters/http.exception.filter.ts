@@ -167,6 +167,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Error en la solicitud';
     }
 
+    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+      return {
+        statusCode,
+        message: 'Error interno del servidor',
+        data: null,
+        internalDetail: message,
+      };
+    }
+
     if (
       statusCode === HttpStatus.NOT_FOUND &&
       /^Cannot (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/.test(message)

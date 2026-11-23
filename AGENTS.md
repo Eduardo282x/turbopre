@@ -149,8 +149,9 @@ TurboPre/
 - **Idioma**: identificadores, archivos y commits en inglés; textos de interfaz,
   mensajes de error y documentación para el negocio en español.
 - **Backend**: ESM (imports relativos con `.js`), validación con
-  `StandardSchemaValidationPipe` + zod, `PrismaService.db` con inicialización
-  perezosa. Nunca edites `apps/backend/src/generated/prisma`.
+  `StandardSchemaValidationPipe` + zod, `PrismaService` extiende `PrismaClient`
+  con pool de `pg` y conexión al arranque. Nunca edites
+  `apps/backend/src/generated/prisma`.
 - **Frontend**: rutas lazy, server state con TanStack Query, estado global con
   zustand, llamadas HTTP solo a través de `services/<dominio>/`. Detalles en
   `apps/frontend/AGENTS.md`.

@@ -29,7 +29,7 @@ describe('TurboPre API (e2e)', () => {
     await expect(response.json()).resolves.toMatchObject({
       success: true,
       statusCode: 200,
-      message: expect.any(String),
+      message: 'Servicio disponible',
       data: {
         status: 'ok',
         service: 'turbopre-api',
