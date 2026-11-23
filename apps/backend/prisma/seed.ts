@@ -1133,12 +1133,787 @@ async function seedDemoInspections(
   );
 }
 
+type DemoRouteTaskSeed = {
+  stage: number;
+  sequence: number;
+  positionCode: string;
+  assignedToId: string;
+  description: string;
+  criteria?: string;
+  formRef?: string;
+  status: 'PENDING' | 'COMPLETED';
+  completedDaysAgo?: number;
+  evidence?: boolean;
+  annexSelected?: boolean;
+};
+
+type DemoRouteReviewSeed = {
+  stage: 'MANAGER_APPROVAL' | 'ANNEX_REVIEW' | 'QUALITY_APPROVAL';
+  reviewerId: string;
+  decision: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  comments?: string;
+  daysAgo: number;
+};
+
+type DemoRouteSeed = {
+  id: string;
+  code: string;
+  serviceOrderId: string;
+  inspectionId: string;
+  status:
+    | 'DRAFT'
+    | 'PENDING_APPROVAL'
+    | 'RELEASED'
+    | 'IN_PROGRESS'
+    | 'PENDING_ANNEX_REVIEW'
+    | 'PENDING_QUALITY_APPROVAL'
+    | 'COMPLETED'
+    | 'CANCELLED';
+  createdById: string;
+  createdDaysAgo: number;
+  releasedDaysAgo?: number;
+  completedDaysAgo?: number;
+  notes: string;
+  orderStatus: 'OPEN' | 'IN_PROGRESS' | 'READY_FOR_DELIVERY' | 'DELIVERED';
+  deliveredDaysAgo?: number;
+  reviews: DemoRouteReviewSeed[];
+  tasks: DemoRouteTaskSeed[];
+};
+
+const DEMO_ROUTE_SHEETS: DemoRouteSeed[] = [
+  {
+    id: 'route-001',
+    code: 'HR-2026-001',
+    serviceOrderId: 'so-1915',
+    inspectionId: 'insp-001',
+    status: 'IN_PROGRESS',
+    createdById: 'u-eng-1',
+    createdDaysAgo: 11,
+    releasedDaysAgo: 8,
+    notes: 'Se debe registrar evidencia fotográfica de cada paso.',
+    orderStatus: 'IN_PROGRESS',
+    reviews: [
+      {
+        stage: 'MANAGER_APPROVAL',
+        reviewerId: 'u-project',
+        decision: 'APPROVED',
+        comments: 'Plan de trabajo aprobado. Liberar a taller.',
+        daysAgo: 8,
+      },
+    ],
+    tasks: [
+      {
+        stage: 3,
+        sequence: 60,
+        positionCode: 'DRAWING_ENGINEER',
+        assignedToId: 'u-eng-1',
+        description: 'Elaborar plano de reparación de biela y alojamiento.',
+        criteria: 'PR-ING-100',
+        formRef: 'FO-ING-120',
+        status: 'COMPLETED',
+        completedDaysAgo: 7,
+      },
+      {
+        stage: 3,
+        sequence: 70,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Revisar y aprobar plano de reparación.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-155',
+        status: 'COMPLETED',
+        completedDaysAgo: 6,
+      },
+      {
+        stage: 4,
+        sequence: 80,
+        positionCode: 'MACHINE_OPERATOR_I',
+        assignedToId: 'u-op-mach-1',
+        description: 'Mecanizar superficie de biela según plano aprobado.',
+        criteria: 'PR-TUR-100',
+        status: 'COMPLETED',
+        completedDaysAgo: 5,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 4,
+        sequence: 90,
+        positionCode: 'WELDER_I',
+        assignedToId: 'u-op-weld-1',
+        description: 'Reparar fisura por soldadura GTAW y verificar penetración.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 4,
+        sequence: 100,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Realizar END con tintes penetrantes a la soldadura.',
+        criteria: 'IN-CAL-102',
+        formRef: 'FO-ING-110',
+        status: 'PENDING',
+      },
+      {
+        stage: 4,
+        sequence: 105,
+        positionCode: 'DRAWING_ENGINEER',
+        assignedToId: 'u-eng-1',
+        description: 'Revisar y firmar plano final de reparación.',
+        criteria: 'PR-ING-101',
+        formRef: 'FO-ING-121',
+        status: 'PENDING',
+      },
+      {
+        stage: 5,
+        sequence: 110,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Liberación final de calidad y verificación para despacho.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-184',
+        status: 'PENDING',
+      },
+    ],
+  },
+  {
+    id: 'route-002',
+    code: 'HR-2026-002',
+    serviceOrderId: 'so-1855',
+    inspectionId: 'insp-003',
+    status: 'PENDING_APPROVAL',
+    createdById: 'u-eng-2',
+    createdDaysAgo: 4,
+    notes: 'Hoja basada en el procedimiento PR-TUR-100 y el formato real de hoja de ruta.',
+    orderStatus: 'IN_PROGRESS',
+    reviews: [],
+    tasks: [
+      {
+        stage: 3,
+        sequence: 50,
+        positionCode: 'DEBURRER',
+        assignedToId: 'u-op-mach-2',
+        description: 'Efectuar la aplicación de estaño.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 60,
+        positionCode: 'DEBURRER',
+        assignedToId: 'u-op-mach-2',
+        description: 'Efectuar precalentamiento sobre el material base.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 70,
+        positionCode: 'DEBURRER',
+        assignedToId: 'u-op-mach-2',
+        description: 'Aplicar Babbitt de forma homogénea sobre el material base.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 80,
+        positionCode: 'MACHINE_OPERATOR_I',
+        assignedToId: 'u-op-mach-1',
+        description: 'Mecanizar de forma manual el remanente de material de Babbitt.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 90,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Realizar prueba de ultrasonido (proceso).',
+        criteria: 'IN-CAL-115',
+        formRef: 'FO-ING-111',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 100,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Realizar END con tintes penetrantes coloreados (proceso).',
+        criteria: 'IN-CAL-102',
+        formRef: 'FO-ING-110',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 110,
+        positionCode: 'MACHINE_OPERATOR_I',
+        assignedToId: 'u-op-mach-1',
+        description: 'Mecanizar hasta dimensiones finales requeridas.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 120,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Realizar inspección dimensional final.',
+        criteria: 'IN-CAL-132',
+        formRef: 'FO-ING-157',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 130,
+        positionCode: 'ROTATING_SPECIALIST',
+        assignedToId: 'u-op-rot-1',
+        description: 'Instalar RTD (4 por cojinete).',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 140,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Realizar inspección visual final y registro fotográfico.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-155',
+        status: 'PENDING',
+      },
+      {
+        stage: 3,
+        sequence: 150,
+        positionCode: 'DEBURRER',
+        assignedToId: 'u-op-mach-2',
+        description: 'Aplicar pintura y protector anticorrosivo al componente.',
+        criteria: 'PR-TUR-100',
+        status: 'PENDING',
+      },
+    ],
+  },
+  {
+    id: 'route-003',
+    code: 'HR-2026-003',
+    serviceOrderId: 'so-1901',
+    inspectionId: 'insp-004',
+    status: 'PENDING_ANNEX_REVIEW',
+    createdById: 'u-eng-1',
+    createdDaysAgo: 22,
+    releasedDaysAgo: 19,
+    notes: 'Todas las tareas completadas. Pendiente selección de anexos por Ingeniería.',
+    orderStatus: 'IN_PROGRESS',
+    reviews: [
+      {
+        stage: 'MANAGER_APPROVAL',
+        reviewerId: 'u-project',
+        decision: 'APPROVED',
+        comments: 'Plan aprobado para mantenimiento mayor del generador.',
+        daysAgo: 19,
+      },
+    ],
+    tasks: [
+      {
+        stage: 3,
+        sequence: 50,
+        positionCode: 'WINDER_II',
+        assignedToId: 'u-op-gen-1',
+        description: 'Instalar bobinas y cuñas del estator.',
+        criteria: 'PR-GEN-120',
+        formRef: 'FO-ING-172',
+        status: 'COMPLETED',
+        completedDaysAgo: 8,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 3,
+        sequence: 60,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-2',
+        description: 'Prueba de resistencia de aislamiento final.',
+        criteria: 'IN-CAL-115',
+        formRef: 'FO-ING-111',
+        status: 'COMPLETED',
+        completedDaysAgo: 6,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 4,
+        sequence: 70,
+        positionCode: 'DRAWING_ENGINEER',
+        assignedToId: 'u-eng-1',
+        description: 'Elaborar informe de cierre y memoria técnica.',
+        criteria: 'PR-ING-110',
+        formRef: 'FO-ING-130',
+        status: 'COMPLETED',
+        completedDaysAgo: 3,
+        evidence: true,
+        annexSelected: false,
+      },
+      {
+        stage: 4,
+        sequence: 80,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-2',
+        description: 'Revisión final de evidencias y anexos.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-155',
+        status: 'COMPLETED',
+        completedDaysAgo: 2,
+        evidence: true,
+        annexSelected: true,
+      },
+    ],
+  },
+  {
+    id: 'route-004',
+    code: 'HR-2026-004',
+    serviceOrderId: 'so-1888',
+    inspectionId: 'insp-006',
+    status: 'PENDING_QUALITY_APPROVAL',
+    createdById: 'u-eng-1',
+    createdDaysAgo: 16,
+    releasedDaysAgo: 13,
+    notes: 'Anexos seleccionados. Pendiente visto bueno de Calidad.',
+    orderStatus: 'IN_PROGRESS',
+    reviews: [
+      {
+        stage: 'MANAGER_APPROVAL',
+        reviewerId: 'u-project',
+        decision: 'APPROVED',
+        comments: 'Aprobado. Proceder con la inspección de combustión.',
+        daysAgo: 13,
+      },
+      {
+        stage: 'ANNEX_REVIEW',
+        reviewerId: 'u-eng-1',
+        decision: 'APPROVED',
+        comments: 'Evidencias seleccionadas para el expediente.',
+        daysAgo: 1,
+      },
+    ],
+    tasks: [
+      {
+        stage: 2,
+        sequence: 30,
+        positionCode: 'MECHANIC_I',
+        assignedToId: 'u-op-rot-2',
+        description: 'Limpieza y verificación de cámaras de combustión.',
+        criteria: 'PR-TUR-110',
+        formRef: 'FO-ING-120',
+        status: 'COMPLETED',
+        completedDaysAgo: 8,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 2,
+        sequence: 40,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-1',
+        description: 'Verificación dimensional y liberación de componentes.',
+        criteria: 'IN-CAL-132',
+        formRef: 'FO-ING-157',
+        status: 'COMPLETED',
+        completedDaysAgo: 5,
+        evidence: true,
+        annexSelected: true,
+      },
+    ],
+  },
+  {
+    id: 'route-005',
+    code: 'HR-2026-005',
+    serviceOrderId: 'so-1870',
+    inspectionId: 'insp-007',
+    status: 'COMPLETED',
+    createdById: 'u-eng-2',
+    createdDaysAgo: 24,
+    releasedDaysAgo: 21,
+    completedDaysAgo: 1,
+    notes: 'Calidad aprobó la hoja. Pendiente confirmación de entrega por Ventas.',
+    orderStatus: 'READY_FOR_DELIVERY',
+    reviews: [
+      {
+        stage: 'MANAGER_APPROVAL',
+        reviewerId: 'u-project',
+        decision: 'APPROVED',
+        comments: 'Aprobado para recuperación del rotor.',
+        daysAgo: 21,
+      },
+      {
+        stage: 'ANNEX_REVIEW',
+        reviewerId: 'u-eng-2',
+        decision: 'APPROVED',
+        comments: 'Expediente de evidencias completo.',
+        daysAgo: 3,
+      },
+      {
+        stage: 'QUALITY_APPROVAL',
+        reviewerId: 'u-quality-1',
+        decision: 'APPROVED',
+        comments: 'Liberado por Calidad. Listo para entrega.',
+        daysAgo: 1,
+      },
+    ],
+    tasks: [
+      {
+        stage: 2,
+        sequence: 30,
+        positionCode: 'MACHINE_OPERATOR_II',
+        assignedToId: 'u-op-mach-1',
+        description: 'Recuperar sellos y mecanizar superficies de apoyo.',
+        criteria: 'PR-MEC-100',
+        formRef: 'FO-ING-157',
+        status: 'COMPLETED',
+        completedDaysAgo: 12,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 2,
+        sequence: 40,
+        positionCode: 'ROTATING_SPECIALIST',
+        assignedToId: 'u-op-rot-1',
+        description: 'Balanceo dinámico del rotor y verificación final.',
+        criteria: 'IN-CAL-120',
+        formRef: 'FO-ING-160',
+        status: 'COMPLETED',
+        completedDaysAgo: 8,
+        evidence: true,
+        annexSelected: true,
+      },
+    ],
+  },
+  {
+    id: 'route-006',
+    code: 'HR-2026-006',
+    serviceOrderId: 'so-1802',
+    inspectionId: 'insp-008',
+    status: 'COMPLETED',
+    createdById: 'u-eng-1',
+    createdDaysAgo: 54,
+    releasedDaysAgo: 51,
+    completedDaysAgo: 10,
+    notes: 'Expediente entregado y archivado.',
+    orderStatus: 'DELIVERED',
+    deliveredDaysAgo: 9,
+    reviews: [
+      {
+        stage: 'MANAGER_APPROVAL',
+        reviewerId: 'u-project',
+        decision: 'APPROVED',
+        comments: 'Aprobado el mantenimiento mayor.',
+        daysAgo: 51,
+      },
+      {
+        stage: 'ANNEX_REVIEW',
+        reviewerId: 'u-eng-1',
+        decision: 'APPROVED',
+        comments: 'Anexos revisados y seleccionados.',
+        daysAgo: 12,
+      },
+      {
+        stage: 'QUALITY_APPROVAL',
+        reviewerId: 'u-quality-2',
+        decision: 'APPROVED',
+        comments: 'Calidad libera el expediente.',
+        daysAgo: 10,
+      },
+    ],
+    tasks: [
+      {
+        stage: 2,
+        sequence: 30,
+        positionCode: 'WELDER_FI',
+        assignedToId: 'u-op-weld-2',
+        description: 'Reparación de componentes de combustión por soldadura especial.',
+        criteria: 'PR-SOL-100',
+        formRef: 'FO-ING-140',
+        status: 'COMPLETED',
+        completedDaysAgo: 25,
+        evidence: true,
+        annexSelected: true,
+      },
+      {
+        stage: 2,
+        sequence: 40,
+        positionCode: 'QUALITY_INSPECTOR',
+        assignedToId: 'u-quality-2',
+        description: 'Inspección final y liberación de componentes.',
+        criteria: 'PR-CAL-109',
+        formRef: 'FO-ING-155',
+        status: 'COMPLETED',
+        completedDaysAgo: 20,
+        evidence: true,
+        annexSelected: true,
+      },
+    ],
+  },
+];
+
+function demoEvidenceUrl(label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#e2e8f0"/><rect x="24" y="24" width="592" height="312" fill="none" stroke="#94a3b8" stroke-width="4" stroke-dasharray="12 8"/><text x="320" y="168" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#334155">EVIDENCIA FOTOGRÁFICA</text><text x="320" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#475569">${label}</text><text x="320" y="246" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#64748b">TurboPre Services · CAMI</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function demoDocumentUrl(label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#f8fafc"/><rect x="24" y="24" width="592" height="312" fill="none" stroke="#0ea5e9" stroke-width="4"/><text x="320" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#0f172a">DOCUMENTO DE HOJA DE RUTA</text><text x="320" y="192" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#334155">${label}</text><text x="320" y="234" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#64748b">TurboPre Services · Ingeniería</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+const DEMO_ROUTE_DOCUMENTS = [
+  {
+    id: 'route-001-doc-01',
+    routeSheetId: 'route-001',
+    label: 'Plano de reparación de biela y alojamiento',
+    type: 'PLAN' as const,
+    uploadedById: 'u-eng-1',
+    daysAgo: 10,
+  },
+  {
+    id: 'route-003-doc-01',
+    routeSheetId: 'route-003',
+    label: 'Informe de cierre del generador GE 7FH2',
+    type: 'PDF' as const,
+    uploadedById: 'u-eng-1',
+    daysAgo: 4,
+  },
+  {
+    id: 'route-005-doc-01',
+    routeSheetId: 'route-005',
+    label: 'Certificado de balanceo del rotor GE ST-300',
+    type: 'CERTIFICATE' as const,
+    uploadedById: 'u-eng-2',
+    daysAgo: 6,
+  },
+];
+
+async function seedDemoRoutes(
+  jobPositionIds: Map<string, string>,
+): Promise<void> {
+  if (!shouldSeedDemoUsers()) {
+    console.log('Hojas de ruta demo omitidas (SEED_DEMO_USERS=false o NODE_ENV=production).');
+    return;
+  }
+
+  let taskCount = 0;
+  let reviewCount = 0;
+  let evidenceCount = 0;
+  let documentCount = 0;
+
+  for (const route of DEMO_ROUTE_SHEETS) {
+    const createdAt = shiftDays(-route.createdDaysAgo);
+    const releasedAt =
+      route.releasedDaysAgo !== undefined ? shiftDays(-route.releasedDaysAgo) : null;
+    const completedAt =
+      route.completedDaysAgo !== undefined ? shiftDays(-route.completedDaysAgo) : null;
+    const updatedAt = completedAt ?? releasedAt ?? createdAt;
+
+    await prisma.routeSheet.upsert({
+      where: { id: route.id },
+      update: {
+        code: route.code,
+        serviceOrderId: route.serviceOrderId,
+        inspectionId: route.inspectionId,
+        createdById: route.createdById,
+        status: route.status,
+        releasedAt,
+        completedAt,
+        notes: route.notes,
+        createdAt,
+        updatedAt,
+      },
+      create: {
+        id: route.id,
+        code: route.code,
+        serviceOrderId: route.serviceOrderId,
+        inspectionId: route.inspectionId,
+        createdById: route.createdById,
+        status: route.status,
+        releasedAt,
+        completedAt,
+        notes: route.notes,
+        createdAt,
+        updatedAt,
+      },
+    });
+
+    // Las tareas ya realizadas en la inspección se conservan como parte de la hoja.
+    await prisma.task.updateMany({
+      where: { inspectionId: route.inspectionId, routeSheetId: null },
+      data: { routeSheetId: route.id },
+    });
+
+    for (const [index, task] of route.tasks.entries()) {
+      const jobPositionId = jobPositionIds.get(task.positionCode);
+
+      if (!jobPositionId) {
+        throw new Error(
+          `Puesto ${task.positionCode} no encontrado para la hoja ${route.id}`,
+        );
+      }
+
+      const taskId = `${route.id}-task-${String(index + 1).padStart(2, '0')}`;
+      const taskCreatedAt =
+        task.completedDaysAgo !== undefined
+          ? shiftDays(-task.completedDaysAgo)
+          : createdAt;
+      const taskCompletedAt =
+        task.completedDaysAgo !== undefined
+          ? shiftDays(-task.completedDaysAgo)
+          : null;
+
+      await prisma.task.upsert({
+        where: { id: taskId },
+        update: {
+          inspectionId: null,
+          routeSheetId: route.id,
+          jobPositionId,
+          assignedToId: task.assignedToId,
+          createdById: route.createdById,
+          sequence: task.sequence,
+          stage: task.stage,
+          source: 'ROUTE_SHEET',
+          description: task.description,
+          criteria: task.criteria ?? null,
+          formRef: task.formRef ?? null,
+          status: task.status,
+          requiresEvidence: true,
+          startedAt: taskCompletedAt,
+          completedAt: taskCompletedAt,
+          createdAt: taskCreatedAt,
+          updatedAt: taskCompletedAt ?? taskCreatedAt,
+        },
+        create: {
+          id: taskId,
+          inspectionId: null,
+          routeSheetId: route.id,
+          jobPositionId,
+          assignedToId: task.assignedToId,
+          createdById: route.createdById,
+          sequence: task.sequence,
+          stage: task.stage,
+          source: 'ROUTE_SHEET',
+          description: task.description,
+          criteria: task.criteria ?? null,
+          formRef: task.formRef ?? null,
+          status: task.status,
+          requiresEvidence: true,
+          startedAt: taskCompletedAt,
+          completedAt: taskCompletedAt,
+          createdAt: taskCreatedAt,
+          updatedAt: taskCompletedAt ?? taskCreatedAt,
+        },
+      });
+      taskCount += 1;
+
+      if (task.evidence) {
+        const attachmentId = `${taskId}-evidence`;
+        const attachmentCreatedAt = taskCompletedAt ?? taskCreatedAt;
+
+        await prisma.taskAttachment.upsert({
+          where: { id: attachmentId },
+          update: {
+            taskId,
+            url: demoEvidenceUrl(`${route.code} · ${task.description}`),
+            type: 'PHOTO',
+            uploadedById: task.assignedToId,
+            isSelectedForAnnex: task.annexSelected ?? null,
+            reviewedById: task.annexSelected !== undefined ? route.createdById : null,
+            reviewedAt:
+              task.annexSelected !== undefined ? attachmentCreatedAt : null,
+            createdAt: attachmentCreatedAt,
+          },
+          create: {
+            id: attachmentId,
+            taskId,
+            url: demoEvidenceUrl(`${route.code} · ${task.description}`),
+            type: 'PHOTO',
+            uploadedById: task.assignedToId,
+            isSelectedForAnnex: task.annexSelected ?? null,
+            reviewedById: task.annexSelected !== undefined ? route.createdById : null,
+            reviewedAt:
+              task.annexSelected !== undefined ? attachmentCreatedAt : null,
+            createdAt: attachmentCreatedAt,
+          },
+        });
+        evidenceCount += 1;
+      }
+    }
+
+    for (const [index, review] of route.reviews.entries()) {
+      const reviewId = `${route.id}-review-${String(index + 1).padStart(2, '0')}`;
+
+      await prisma.routeSheetReview.upsert({
+        where: { id: reviewId },
+        update: {
+          routeSheetId: route.id,
+          stage: review.stage,
+          reviewerId: review.reviewerId,
+          decision: review.decision,
+          comments: review.comments ?? null,
+          createdAt: shiftDays(-review.daysAgo),
+        },
+        create: {
+          id: reviewId,
+          routeSheetId: route.id,
+          stage: review.stage,
+          reviewerId: review.reviewerId,
+          decision: review.decision,
+          comments: review.comments ?? null,
+          createdAt: shiftDays(-review.daysAgo),
+        },
+      });
+      reviewCount += 1;
+    }
+  }
+
+  for (const document of DEMO_ROUTE_DOCUMENTS) {
+    const createdAt = shiftDays(-document.daysAgo);
+    const data = {
+      routeSheetId: document.routeSheetId,
+      url: demoDocumentUrl(document.label),
+      type: document.type,
+      uploadedById: document.uploadedById,
+      createdAt,
+    };
+
+    await prisma.routeSheetDocument.upsert({
+      where: { id: document.id },
+      update: data,
+      create: { id: document.id, ...data },
+    });
+    documentCount += 1;
+  }
+
+  for (const route of DEMO_ROUTE_SHEETS) {
+    await prisma.serviceOrder.update({
+      where: { id: route.serviceOrderId },
+      data: {
+        status: route.orderStatus,
+        ...(route.deliveredDaysAgo !== undefined
+          ? { deliveredAt: shiftDays(-route.deliveredDaysAgo) }
+          : {}),
+      },
+    });
+  }
+
+  console.log(
+    `Hojas de ruta demo listas: ${DEMO_ROUTE_SHEETS.length} hojas, ${taskCount} tareas, ${reviewCount} revisiones, ${evidenceCount} evidencias y ${documentCount} documentos.`,
+  );
+}
+
 async function main(): Promise<void> {
   const jobPositionIds = await seedOrganization();
   const adminId = await seedAdmin();
   await seedDemoUsers(adminId, jobPositionIds);
   await seedDemoCommercial();
   await seedDemoInspections(jobPositionIds);
+  await seedDemoRoutes(jobPositionIds);
   console.log('Catálogos de organización, administrador y usuarios demo sembrados.');
 }
 

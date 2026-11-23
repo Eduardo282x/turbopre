@@ -10,3 +10,4 @@ export * from './domain/clients.js';
 export * from './domain/projects.js';
 export * from './domain/service-orders.js';
 export * from './domain/inspections.js';
+export * from './domain/route-sheets.js';

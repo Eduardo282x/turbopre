@@ -1,8 +1,11 @@
+import type { RouteSheetRecord } from '@turbopre/shared';
+import { canApproveRoute } from '@turbopre/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, CheckCircle2, Eye, ShieldCheck, Timer, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { PriorityBadge } from '@/components/common/badges';
+import { ApiRouteStatusBadge, PriorityBadge } from '@/components/common/badges';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { EmptyState } from '@/components/common/empty-state';
 import { FormDialog } from '@/components/common/form-dialog';
@@ -13,30 +16,66 @@ import { DataTable } from '@/components/table-kit/table';
 import type { DataTableColumn } from '@/components/table-kit/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { getPendingApprovals } from '@/features/preview/store/selectors';
-import { useCurrentUser } from '@/features/preview/store/preview-session';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
-import type { RouteSheetWithRelations } from '@/features/preview/types';
+import { useRouteSheets } from '@/hooks/use-route-sheets';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { daysUntil, formatDate } from '@/lib/formatters';
-import { canApproveRoute } from '@/lib/permissions';
+import { routeSheetsService } from '@/services/route-sheets/route-sheets.service';
+import { useAuthStore } from '@/stores/use-auth-store';
 
 export function ApprovalsPage() {
-  const user = useCurrentUser();
-  const db = usePreviewStore((state) => state.db);
-  const approveRouteSheet = usePreviewStore((state) => state.approveRouteSheet);
-  const rejectRouteSheet = usePreviewStore((state) => state.rejectRouteSheet);
+  const authUser = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+  const routesQuery = useRouteSheets({ status: 'PENDING_APPROVAL' });
   const navigate = useNavigate();
-  const [approving, setApproving] = useState<RouteSheetWithRelations | null>(null);
-  const [rejecting, setRejecting] = useState<RouteSheetWithRelations | null>(null);
+  const [approving, setApproving] = useState<RouteSheetRecord | null>(null);
+  const [rejecting, setRejecting] = useState<RouteSheetRecord | null>(null);
   const [reason, setReason] = useState('');
 
-  if (!user) return null;
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['route-sheets'] });
+    void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+  };
 
-  const routes = getPendingApprovals(db);
-  const critical = routes.filter((route) => route.priority === 'CRITICAL').length;
-  const dueSoon = routes.filter((route) => daysUntil(route.dueDate) <= 3).length;
+  const approveMutation = useMutation({
+    mutationFn: (route: RouteSheetRecord) => routeSheetsService.approve(route.id),
+    onSuccess: (route) => {
+      invalidate();
+      toast.success(`${route.code} aprobada y liberada`);
+      setApproving(null);
+    },
+    onError: (error) =>
+      toast.error('No se pudo aprobar la hoja', {
+        description: getApiErrorMessage(error),
+      }),
+  });
 
-  const columns: DataTableColumn<RouteSheetWithRelations>[] = [
+  const rejectMutation = useMutation({
+    mutationFn: ({ route, reason }: { route: RouteSheetRecord; reason: string }) =>
+      routeSheetsService.reject(route.id, { reason }),
+    onSuccess: (route) => {
+      invalidate();
+      toast.info(`${route.code} devuelta a Ingeniería`);
+      setRejecting(null);
+      setReason('');
+    },
+    onError: (error) =>
+      toast.error('No se pudo devolver la hoja', {
+        description: getApiErrorMessage(error),
+      }),
+  });
+
+  if (!authUser) return null;
+
+  const routes = routesQuery.data ?? [];
+  const critical = routes.filter(
+    (route) => route.serviceOrder.priority === 'CRITICAL',
+  ).length;
+  const dueSoon = routes.filter(
+    (route) =>
+      route.serviceOrder.dueAt && daysUntil(route.serviceOrder.dueAt) <= 3,
+  ).length;
+
+  const columns: DataTableColumn<RouteSheetRecord>[] = [
     {
       id: 'route',
       header: 'Hoja de ruta',
@@ -44,7 +83,7 @@ export function ApprovalsPage() {
         <div className="min-w-0">
           <p className="font-semibold text-foreground">{route.code}</p>
           <p className="font-mono text-[11px] text-muted-foreground">
-            ODS {route.serviceOrder.code} · {route.serviceOrder.subCode}
+            ODS {route.serviceOrder.orderNumber}
           </p>
         </div>
       ),
@@ -56,36 +95,57 @@ export function ApprovalsPage() {
       header: 'Cliente / equipo',
       cell: (route) => (
         <div className="text-xs">
-          <p className="font-medium text-foreground">{route.client?.name ?? '—'}</p>
+          <p className="font-medium text-foreground">
+            {route.serviceOrder.clientName}
+          </p>
           <p className="text-muted-foreground">
-            {route.asset?.manufacturer} {route.asset?.model} · {route.equipmentCode}
+            {route.serviceOrder.equipmentName} · {route.serviceOrder.equipmentCode}
           </p>
         </div>
       ),
       hideOnMobile: true,
     },
     {
+      id: 'status',
+      header: 'Estado',
+      cell: (route) => <ApiRouteStatusBadge status={route.status} />,
+    },
+    {
       id: 'priority',
       header: 'Prioridad',
-      cell: (route) => <PriorityBadge priority={route.priority} />,
+      cell: (route) => <PriorityBadge priority={route.serviceOrder.priority} />,
     },
     {
       id: 'due',
       header: 'Entrega',
       cell: (route) => {
-        const days = daysUntil(route.dueDate);
+        if (!route.serviceOrder.dueAt) {
+          return <span className="text-xs text-muted-foreground">Sin fecha</span>;
+        }
+        const days = daysUntil(route.serviceOrder.dueAt);
         return (
           <div className="text-xs">
-            <p className="text-foreground">{formatDate(route.dueDate)}</p>
-            <p className={days < 0 ? 'text-destructive' : days <= 3 ? 'text-warning' : 'text-muted-foreground'}>
-              {days < 0 ? `${Math.abs(days)} días de retraso` : `En ${days} días`}
+            <p className="text-foreground">{formatDate(route.serviceOrder.dueAt)}</p>
+            <p
+              className={
+                days < 0
+                  ? 'text-destructive'
+                  : days <= 3
+                    ? 'text-warning'
+                    : 'text-muted-foreground'
+              }
+            >
+              {days < 0
+                ? `${Math.abs(days)} días de retraso`
+                : `En ${days} días`}
             </p>
           </div>
         );
       },
       hideOnMobile: true,
       sortable: true,
-      sortValue: (route) => new Date(route.dueDate),
+      sortValue: (route) =>
+        route.serviceOrder.dueAt ? new Date(route.serviceOrder.dueAt) : new Date(0),
     },
     {
       id: 'progress',
@@ -104,8 +164,8 @@ export function ApprovalsPage() {
       header: 'Preparada por',
       cell: (route) => (
         <div className="text-xs text-muted-foreground">
-          <p>{route.creator.name}</p>
-          <p>{formatDate(route.preparedAt)}</p>
+          <p>{route.createdBy.name}</p>
+          <p>{formatDate(route.createdAt)}</p>
         </div>
       ),
       hideOnMobile: true,
@@ -121,12 +181,34 @@ export function ApprovalsPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Pendientes" value={routes.length} hint="Hojas por aprobar" icon={BadgeCheck} tone="warning" />
-        <KpiCard label="Críticas" value={critical} hint="Prioridad crítica" icon={ShieldCheck} tone="danger" />
-        <KpiCard label="Por vencer" value={dueSoon} hint="Entrega en 3 días o menos" icon={Timer} tone="accent" />
+        <KpiCard
+          label="Pendientes"
+          value={routes.length}
+          hint="Hojas por aprobar"
+          icon={BadgeCheck}
+          tone="warning"
+        />
+        <KpiCard
+          label="Críticas"
+          value={critical}
+          hint="Prioridad crítica"
+          icon={ShieldCheck}
+          tone="danger"
+        />
+        <KpiCard
+          label="Por vencer"
+          value={dueSoon}
+          hint="Entrega en 3 días o menos"
+          icon={Timer}
+          tone="accent"
+        />
       </div>
 
-      {routes.length === 0 ? (
+      {routesQuery.isLoading ? (
+        <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+          Cargando aprobaciones…
+        </p>
+      ) : routes.length === 0 ? (
         <EmptyState
           icon={CheckCircle2}
           title="Sin aprobaciones pendientes"
@@ -140,7 +222,7 @@ export function ApprovalsPage() {
           search={{
             placeholder: 'Buscar por hoja, ODS, cliente o equipo…',
             getText: (route) =>
-              `${route.code} ${route.serviceOrder.code} ${route.client?.name ?? ''} ${route.asset?.model ?? ''}`,
+              `${route.code} ${route.serviceOrder.orderNumber} ${route.serviceOrder.clientName} ${route.serviceOrder.equipmentName}`,
           }}
           actions={[
             {
@@ -151,14 +233,14 @@ export function ApprovalsPage() {
             {
               label: 'Aprobar',
               icon: CheckCircle2,
-              hidden: (route) => !canApproveRoute(user, route),
+              hidden: (route) => !canApproveRoute(authUser.role, route.status),
               onSelect: (route) => setApproving(route),
             },
             {
               label: 'Rechazar',
               icon: XCircle,
               variant: 'destructive',
-              hidden: (route) => !canApproveRoute(user, route),
+              hidden: (route) => !canApproveRoute(authUser.role, route.status),
               onSelect: (route) => {
                 setRejecting(route);
                 setReason('');
@@ -183,9 +265,7 @@ export function ApprovalsPage() {
         confirmLabel="Aprobar y liberar"
         onConfirm={() => {
           if (!approving) return;
-          approveRouteSheet(approving.id, user.id);
-          toast.success(`${approving.code} aprobada y liberada`);
-          setApproving(null);
+          approveMutation.mutate(approving);
         }}
       />
 
@@ -204,16 +284,14 @@ export function ApprovalsPage() {
             <Button
               type="button"
               variant="destructive"
+              disabled={rejectMutation.isPending}
               onClick={() => {
                 if (!rejecting) return;
                 if (!reason.trim()) {
                   toast.error('Escribe el motivo del rechazo');
                   return;
                 }
-                rejectRouteSheet(rejecting.id, user.id, reason.trim());
-                toast.info('Hoja devuelta a Ingeniería');
-                setRejecting(null);
-                setReason('');
+                rejectMutation.mutate({ route: rejecting, reason: reason.trim() });
               }}
             >
               Confirmar rechazo

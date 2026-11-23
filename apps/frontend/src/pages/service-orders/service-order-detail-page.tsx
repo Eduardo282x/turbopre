@@ -18,9 +18,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import {
+  ApiRouteStatusBadge,
   InspectionStatusBadge,
   PriorityBadge,
-  RouteStatusBadge,
   ServiceOrderStatusBadge,
 } from '@/components/common/badges';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -31,17 +31,13 @@ import { SectionCard } from '@/components/common/section-card';
 import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AUDIT_ACTION_META } from '@/features/preview/config';
-import { getRouteSheetWithRelations } from '@/features/preview/store/selectors';
 import { useCurrentUser } from '@/features/preview/store/preview-session';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { useInspection } from '@/hooks/use-inspections';
+import { useRouteSheet } from '@/hooks/use-route-sheets';
 import { useServiceOrder } from '@/hooks/use-commercial-data';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { formatDate, formatDateTime } from '@/lib/formatters';
-import { previewRouteStatusToApi } from '@/lib/preview-status';
 import { canCreateInspection, canManageRoutes, canManageServiceOrders } from '@/lib/permissions';
-import { deriveServiceOrderWorkflowStatus } from '@turbopre/shared';
 import type { CreateServiceOrderInput, ServiceOrderWorkflowStatus } from '@turbopre/shared';
 import { serviceOrdersService } from '@/services/service-orders/service-orders.service';
 import { ServiceOrderFormDialog } from './service-order-form-dialog';
@@ -66,7 +62,7 @@ export function ServiceOrderDetailPage() {
   const queryClient = useQueryClient();
   const orderQuery = useServiceOrder(id);
   const inspectionQuery = useInspection(orderQuery.data?.inspectionId ?? undefined);
-  const db = usePreviewStore((state) => state.db);
+  const routeSheetQuery = useRouteSheet(orderQuery.data?.routeSheetId ?? undefined);
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -152,39 +148,21 @@ export function ServiceOrderDetailPage() {
     );
   }
 
-  const previewOrder = db.serviceOrders.find((item) => item.id === order.id);
   const inspection = inspectionQuery.data ?? null;
-  const routeSheet = previewOrder?.routeSheetId
-    ? getRouteSheetWithRelations(db, previewOrder.routeSheetId)
-    : undefined;
-  const inspectionId = order.inspectionId ?? previewOrder?.inspectionId ?? null;
-  const routeSheetId = order.routeSheetId ?? previewOrder?.routeSheetId ?? null;
-  const displayStatus = deriveServiceOrderWorkflowStatus({
-    status: order.status,
-    inspectionStatus: inspection?.status ?? order.inspectionStatus,
-    routeSheetStatus: routeSheet ? previewRouteStatusToApi(routeSheet.status) : null,
-  });
-  const displayProgress = inspection?.progress ?? order.progress;
+  const routeSheet = routeSheetQuery.data ?? null;
+  const inspectionId = order.inspectionId;
+  const routeSheetId = order.routeSheetId;
+  const displayStatus = order.workflowStatus;
+  const displayProgress = routeSheet?.progress ?? inspection?.progress ?? order.progress;
 
   const currentFlowIndex = Math.max(
     0,
     FLOW.findIndex((step) => step.statuses.includes(displayStatus)),
   );
 
-  const orderAudit = db.audit
-    .filter((entry) =>
-      [
-        order.orderNumber,
-        order.id,
-        previewOrder?.code,
-        previewOrder?.subCode,
-        inspection?.code,
-        routeSheet?.code,
-      ]
-        .filter(Boolean)
-        .includes(entry.entityId),
-    )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const routeReviews = [...(routeSheet?.reviews ?? [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 
   const canEdit =
     canManageServiceOrders(user) &&
@@ -416,7 +394,7 @@ export function ServiceOrderDetailPage() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold text-foreground">{routeSheet.code}</p>
-                  <RouteStatusBadge status={routeSheet.status} />
+                  <ApiRouteStatusBadge status={routeSheet.status} />
                 </div>
                 <ProgressBar
                   value={routeSheet.progress}
@@ -442,11 +420,6 @@ export function ServiceOrderDetailPage() {
                     </Link>
                   </Button>
                 )}
-                {!previewOrder && (
-                  <p className="text-[11px]">
-                    La creación de hojas de ruta se conectará en una fase posterior.
-                  </p>
-                )}
               </div>
             )}
           </SectionCard>
@@ -454,25 +427,31 @@ export function ServiceOrderDetailPage() {
       </div>
 
       <SectionCard
-        title="Historial de la orden"
-        description="Eventos registrados para la ODS, la inspección y la hoja de ruta."
+        title="Revisiones de la hoja de ruta"
+        description="Aprobaciones, devoluciones y visto bueno registrados."
       >
-        {orderAudit.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin eventos registrados todavía.</p>
+        {routeReviews.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin revisiones registradas todavía.</p>
         ) : (
           <Timeline
-            items={orderAudit.map((entry) => ({
-              title: `${AUDIT_ACTION_META[entry.action].label} · ${entry.entity}`,
-              description: `${entry.userName}: ${entry.detail}`,
-              date: formatDateTime(entry.createdAt),
+            items={routeReviews.map((review) => ({
+              title: `${review.stage === 'MANAGER_APPROVAL' ? 'Aprobación de Gerencia' : review.stage === 'ANNEX_REVIEW' ? 'Revisión de anexos' : 'Visto bueno de Calidad'} · ${
+                review.decision === 'APPROVED'
+                  ? 'Aprobado'
+                  : review.decision === 'REJECTED'
+                    ? 'Rechazado'
+                    : 'Cambios solicitados'
+              }`,
+              description: `${review.reviewer.name}${
+                review.comments ? `: ${review.comments}` : ''
+              }`,
+              date: formatDateTime(review.createdAt),
               tone:
-                entry.action === 'REJECT' || entry.action === 'DELETE'
-                  ? 'danger'
-                  : entry.action === 'APPROVE' ||
-                      entry.action === 'COMPLETE' ||
-                      entry.action === 'DELIVER'
-                    ? 'success'
-                    : 'info',
+                review.decision === 'APPROVED'
+                  ? 'success'
+                  : review.decision === 'REJECTED'
+                    ? 'danger'
+                    : 'warning',
             }))}
           />
         )}

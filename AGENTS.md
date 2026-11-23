@@ -81,16 +81,18 @@ Deseable a futuro (nada de esto está implementado todavía):
 - Auth JWT contra PostgreSQL; `pnpm db:seed` crea catálogos, el administrador
   (`admin` / `admin1234`) y, fuera de producción, un usuario demo por rol
   (contraseña `demo1234`). Endpoints: `/api/health`, `/api/auth/*`, `/api/users`,
-  `/api/catalogs`.
+  `/api/catalogs`, `/api/clients`, `/api/sites`, `/api/equipment`,
+  `/api/projects`, `/api/service-orders`, `/api/inspections`, `/api/route-sheets`
+  y `/api/tasks`.
 - Prisma 7 con el modelo de dominio completo en `apps/backend/prisma/schema.prisma`;
   la documentación funcional y los diagramas están en `docs/domain-model.md`.
 - Deploy de QA preparado: `apps/frontend/vercel.json` y `render.yaml`.
 - **Conectado**: login, sesión JWT, `/auth/me`, usuarios, catálogos, clientes,
-  sitios, equipos, proyectos, órdenes de servicio, inspecciones y tareas de
-  inspección.
-- **Pendiente**: migrar hojas de ruta, tareas de hoja de ruta, anexos, calidad,
-  almacén, planta, analítica y auditoría desde el preview en `localStorage` a la
-  API, fase por fase.
+  sitios, equipos, proyectos, órdenes de servicio, inspecciones, tareas de
+  inspección, hojas de ruta, tareas de hoja, revisiones de Gerencia/anexos/Calidad
+  y entrega de la ODS.
+- **Pendiente**: migrar repuestos, almacén, planta, analítica y auditoría desde el
+  preview en `localStorage` a la API, fase por fase.
 
 ## 6. Antes de implementar dominio: pregunta
 

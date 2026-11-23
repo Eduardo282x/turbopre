@@ -6,13 +6,19 @@ import { StatusBadge } from '@/components/common/status-badge';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
-import type { CompleteTaskInput, InspectionRecord, TaskRecord } from '@turbopre/shared';
+import type {
+  CompleteTaskInput,
+  InspectionRecord,
+  RouteSheetRecord,
+  TaskRecord,
+} from '@turbopre/shared';
 
 interface ApiCompleteTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: TaskRecord | null;
   inspection?: InspectionRecord | null;
+  routeSheet?: RouteSheetRecord | null;
   pending?: boolean;
   onSubmit: (payload: CompleteTaskInput) => void;
 }
@@ -22,6 +28,7 @@ export function ApiCompleteTaskDialog({
   onOpenChange,
   task,
   inspection,
+  routeSheet,
   pending = false,
   onSubmit,
 }: ApiCompleteTaskDialogProps) {
@@ -83,8 +90,14 @@ export function ApiCompleteTaskDialog({
           </div>
           <p className="mt-2 text-sm font-medium text-foreground">{task.description}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {inspection?.code ?? 'Inspección'} · {inspection?.serviceOrder.clientName ?? 'Sin cliente'} ·{' '}
-            {inspection?.serviceOrder.equipmentName ?? 'Sin equipo'}
+            {routeSheet?.code ?? inspection?.code ?? 'Inspección'} ·{' '}
+            {routeSheet?.serviceOrder.clientName ??
+              inspection?.serviceOrder.clientName ??
+              'Sin cliente'}{' '}
+            ·{' '}
+            {routeSheet?.serviceOrder.equipmentName ??
+              inspection?.serviceOrder.equipmentName ??
+              'Sin equipo'}
           </p>
           {(task.criteria || task.formRef) && (
             <p className="mt-1 text-[11px] text-muted-foreground">

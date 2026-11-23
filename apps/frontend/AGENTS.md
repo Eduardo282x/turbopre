@@ -81,18 +81,19 @@ src/
   login real con los usuarios sembrados (`demo1234`). En producción no aparecen
   (ver `isPreviewMode`).
 
-## Estado de la migración (Fase 3)
+## Estado de la migración (Fase 4)
 
 - **Conectado a la API**: login, `/auth/me`, sesión, usuarios, catálogos,
-  clientes, sitios, equipos, proyectos, órdenes de servicio, inspecciones y
-  tareas de inspección.
+  clientes, sitios, equipos, proyectos, órdenes de servicio, inspecciones,
+  tareas de inspección, hojas de ruta, tareas de hoja, anexos, revisiones de
+  Gerencia/anexos/Calidad y entrega de la ODS.
 - **Sigue en preview** (`src/features/preview/`, zustand + `localStorage`):
-  hojas de ruta, tareas de hoja de ruta, anexos, calidad, repuestos, inventario,
-  solicitudes, préstamos, calibración, rendimiento, mapa de planta, auditoría y
-  datos demo de configuración.
-- Las inspecciones y sus tareas ya son reales. `useServiceOrders` y los detalles
-  de ODS combinan el estado de la inspección API con el estado de la hoja de ruta
-  que aún vive en preview.
+  repuestos, inventario, solicitudes, préstamos, calibración, rendimiento, mapa
+  de planta, auditoría y datos demo de configuración.
+- Las hojas de ruta y sus tareas ya son reales. `useRouteSheets`/
+  `useRouteSheet` alimentan el listado, el editor, el detalle, aprobaciones y Mis
+  Tareas. El estado visible de la ODS se deriva en la API y `useServiceOrders`
+  ya no mezcla el estado de la hoja del preview.
 - Los roles son los canónicos del backend: Administrador (`ADMIN`), Ventas,
   Taller, Ingeniería (`ENGINEER`), Operador, Calidad, Gerente de Proyecto
   (`PROJECT_MANAGER`) y Almacén.
@@ -109,8 +110,8 @@ src/
 - La tabla reutilizable está en `src/components/table-kit/` y las gráficas en
   `src/components/charts/` (shadcn Chart + Recharts).
 - Detalles y modelo provisional: `docs/preview-frontend.md`.
-- Para continuar la migración: conectar hojas de ruta y tareas de hoja en la
-  Fase 4, y luego almacén/analítica.
+- Para continuar la migración: conectar repuestos/almacén y luego
+  planta/analítica/auditoría.
 
 ## Entorno
 

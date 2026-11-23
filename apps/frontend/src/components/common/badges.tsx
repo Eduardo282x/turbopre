@@ -1,5 +1,11 @@
 import { StatusBadge } from '@/components/common/status-badge';
-import type { EquipmentType, ProjectStatus, ServiceOrderWorkflowStatus } from '@turbopre/shared';
+import { ROUTE_SHEET_STATUS_META } from '@/lib/route-status';
+import type {
+  EquipmentType,
+  ProjectStatus,
+  RouteSheetStatus,
+  ServiceOrderWorkflowStatus,
+} from '@turbopre/shared';
 import {
   CALIBRATION_STATUS_META,
   EQUIPMENT_TYPE_META,
@@ -33,6 +39,15 @@ import type {
 
 export function RouteStatusBadge({ status }: { status: RouteStatus }) {
   const meta = ROUTE_STATUS_META[status];
+  return (
+    <StatusBadge tone={meta.tone} dot>
+      {meta.label}
+    </StatusBadge>
+  );
+}
+
+export function ApiRouteStatusBadge({ status }: { status: RouteSheetStatus }) {
+  const meta = ROUTE_SHEET_STATUS_META[status];
   return (
     <StatusBadge tone={meta.tone} dot>
       {meta.label}

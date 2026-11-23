@@ -88,8 +88,17 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 | `POST/PATCH/DELETE` | `/api/inspections/:id/tasks...` | Agregar, editar o eliminar tareas. `ADMIN` y `WORKSHOP`. |
 | `POST` | `/api/inspections/:id/approve` | Aprobar inspección cuando todas las tareas están completas. `ADMIN` y `WORKSHOP`. |
 | `POST` | `/api/inspections/:id/reject` | Rechazar inspección y reabrir la última etapa. `ADMIN` y `WORKSHOP`. |
+| `GET` | `/api/route-sheets` / `/api/route-sheets/:id` | Hojas de ruta con ODS, inspección de origen, tareas, revisiones y avance. |
+| `POST` | `/api/route-sheets` | Crear hoja desde una inspección aprobada; promueve sus tareas. `ADMIN` y `ENGINEER`. |
+| `PATCH` | `/api/route-sheets/:id` | Editar observaciones en borrador. `ADMIN` y `ENGINEER`. |
+| `PUT/POST` | `/api/route-sheets/:id/tasks...` | Reemplazar o agregar tareas. `ADMIN` y `ENGINEER`. |
+| `POST` | `/api/route-sheets/:id/submit` | Enviar el borrador a aprobación de Gerencia. |
+| `POST` | `/api/route-sheets/:id/approve` / `reject` | Aprobar y liberar o devolver a borrador. `ADMIN` y `PROJECT_MANAGER`. |
+| `POST` | `/api/route-sheets/:id/finalize-annexes` / `request-annex-changes` | Cerrar anexos o devolverlos a ejecución. `ADMIN` y `ENGINEER`. |
+| `POST` | `/api/route-sheets/:id/approve-quality` / `reject-quality` | Visto bueno o rechazo de Calidad. `ADMIN` y `QUALITY`. |
+| `PATCH` | `/api/route-sheets/:id/tasks/:taskId/annex` | Incluir o excluir una evidencia de los anexos. |
 | `GET` | `/api/tasks/my` | Tareas propias o de mi puesto, con contexto de inspección/hoja. |
-| `POST` | `/api/tasks/:id/complete` | Completar tarea con evidencia y observaciones, validando puesto/etapa. |
+| `POST` | `/api/tasks/:id/complete` | Completar tarea de inspección o de hoja con evidencia, validando puesto/etapa. |
 | `GET` | `/api/users/options` | Opciones de usuario para asignaciones (responsables, tareas). |
 
 ### Formato de respuesta

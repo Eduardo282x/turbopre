@@ -1,3 +1,10 @@
+import type {
+  InspectionRecord,
+  RouteSheetRecord,
+  TaskContext,
+  TaskRecord,
+} from '@turbopre/shared';
+import { canCompleteTask } from '@turbopre/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -12,8 +19,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
 import {
+  ApiRouteStatusBadge,
   InspectionStatusBadge,
-  RouteStatusBadge,
 } from '@/components/common/badges';
 import { EmptyState } from '@/components/common/empty-state';
 import { KpiCard } from '@/components/common/kpi-card';
@@ -21,46 +28,31 @@ import { PageHeader } from '@/components/common/page-header';
 import { ProgressBar } from '@/components/common/progress-bar';
 import { ApiCompleteTaskDialog } from '@/components/tasks/api-complete-task-dialog';
 import { ApiTaskList } from '@/components/tasks/api-task-list';
-import { CompleteTaskDialog } from '@/components/tasks/complete-task-dialog';
-import { TaskList } from '@/components/tasks/task-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  getMyTasks,
-  getProgress,
-  getRouteSheetsWithRelations,
-  isTaskMine,
-} from '@/features/preview/store/selectors';
-import { useCurrentUser } from '@/features/preview/store/preview-session';
-import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { useInspections, useMyTasks } from '@/hooks/use-inspections';
-import type { InspectionRecord, TaskRecord } from '@turbopre/shared';
+import { useRouteSheets } from '@/hooks/use-route-sheets';
 import { getApiErrorMessage } from '@/lib/api-error';
 import { formatDate } from '@/lib/formatters';
-import { canCompleteTask as canCompletePreviewTask } from '@/lib/permissions';
-import { canCompleteTask as canCompleteApiTask } from '@turbopre/shared';
-import { useAuthStore } from '@/stores/use-auth-store';
 import { tasksService } from '@/services/tasks/tasks.service';
-import type { Task, TaskWithContext } from '@/features/preview/types';
+import { useAuthStore } from '@/stores/use-auth-store';
 
 interface RouteGroup {
-  key: string;
-  route: ReturnType<typeof getRouteSheetsWithRelations>[number];
-  tasks: Task[];
+  route: RouteSheetRecord;
+  contexts: TaskContext[];
 }
 
+const ACTIVE_ROUTE_STATUSES = ['RELEASED', 'IN_PROGRESS'];
+
 export function MyTasksPage() {
-  const user = useCurrentUser();
   const authUser = useAuthStore((state) => state.user);
-  const db = usePreviewStore((state) => state.db);
   const queryClient = useQueryClient();
-  const completePreviewTask = usePreviewStore((state) => state.completeTask);
   const apiTasksQuery = useMyTasks();
   const inspectionsQuery = useInspections();
-  const [previewContext, setPreviewContext] = useState<TaskWithContext | null>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const routesQuery = useRouteSheets();
   const [apiTask, setApiTask] = useState<TaskRecord | null>(null);
   const [apiOpen, setApiOpen] = useState(false);
+  const [completeRoute, setCompleteRoute] = useState<RouteSheetRecord | null>(null);
 
   const apiTasks = useMemo(() => apiTasksQuery.data ?? [], [apiTasksQuery.data]);
   const apiInspectionIds = useMemo(
@@ -89,38 +81,47 @@ export function MyTasksPage() {
     [apiInspectionIds, inspectionsById],
   );
 
-  const previewRouteTasks = useMemo(
-    () => (user ? getMyTasks(db, user).filter((item) => item.routeSheet) : []),
-    [db, user],
+  const routesById = useMemo(
+    () => new Map((routesQuery.data ?? []).map((route) => [route.id, route])),
+    [routesQuery.data],
   );
-  const routeGroups = useMemo(() => {
-    const map = new Map<string, RouteGroup>();
 
-    previewRouteTasks.forEach((item) => {
-      if (!item.routeSheet) return;
-      const key = `route-${item.routeSheet.id}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          route: item.routeSheet,
-          tasks: item.routeSheet.tasks,
-        });
+  const routeGroups = useMemo(() => {
+    const groups = new Map<string, RouteGroup>();
+
+    apiTasks.forEach((context) => {
+      if (!context.routeSheet) return;
+      const route = routesById.get(context.routeSheet.id);
+      if (!route) return;
+
+      const current = groups.get(route.id);
+      if (current) {
+        current.contexts.push(context);
+      } else {
+        groups.set(route.id, { route, contexts: [context] });
       }
     });
 
-    return [...map.values()];
-  }, [previewRouteTasks]);
+    return [...groups.values()];
+  }, [apiTasks, routesById]);
 
   const completeApiMutation = useMutation({
-    mutationFn: ({ taskId, payload }: { taskId: string; payload: Parameters<typeof tasksService.complete>[1] }) =>
-      tasksService.complete(taskId, payload),
+    mutationFn: ({
+      taskId,
+      payload,
+    }: {
+      taskId: string;
+      payload: Parameters<typeof tasksService.complete>[1];
+    }) => tasksService.complete(taskId, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       void queryClient.invalidateQueries({ queryKey: ['inspections'] });
+      void queryClient.invalidateQueries({ queryKey: ['route-sheets'] });
       void queryClient.invalidateQueries({ queryKey: ['service-orders'] });
       toast.success('Tarea marcada como lista. La etapa siguiente se desbloqueó.');
       setApiOpen(false);
       setApiTask(null);
+      setCompleteRoute(null);
     },
     onError: (error) =>
       toast.error('No se pudo completar la tarea', {
@@ -128,39 +129,25 @@ export function MyTasksPage() {
       }),
   });
 
-  if (!user || !authUser) return null;
+  if (!authUser) return null;
 
-  const completedRoutes = getRouteSheetsWithRelations(db).filter(
-    (route) =>
-      route.progress === 100 &&
-      route.tasks.some((task) => isTaskMine(task, user)) &&
-      !routeGroups.some((group) => group.key === `route-${route.id}`),
-  );
+  const pending = apiTasks.filter(
+    (context) => context.task.displayStatus === 'PENDING',
+  ).length;
+  const inProgress = apiTasks.filter(
+    (context) => context.task.displayStatus === 'IN_PROGRESS',
+  ).length;
+  const blocked = apiTasks.filter(
+    (context) => context.task.displayStatus === 'BLOCKED',
+  ).length;
+  const totalTasks = apiTasks.length;
+  const isLoadingTasks =
+    apiTasksQuery.isLoading || inspectionsQuery.isLoading || routesQuery.isLoading;
 
-  const pending =
-    apiTasks.filter((context) => context.task.displayStatus === 'PENDING').length +
-    previewRouteTasks.filter((item) => item.task.status === 'PENDING').length;
-  const inProgress =
-    apiTasks.filter((context) => context.task.displayStatus === 'IN_PROGRESS').length +
-    previewRouteTasks.filter((item) => item.task.status === 'IN_PROGRESS').length;
-  const blocked =
-    apiTasks.filter((context) => context.task.displayStatus === 'BLOCKED').length +
-    previewRouteTasks.filter((item) => item.task.status === 'BLOCKED').length;
-  const totalTasks = apiTasks.length + previewRouteTasks.length;
-  const isLoadingTasks = apiTasksQuery.isLoading || inspectionsQuery.isLoading;
-
-  const openApiComplete = (task: TaskRecord) => {
+  const openApiComplete = (task: TaskRecord, route?: RouteSheetRecord) => {
     setApiTask(task);
+    setCompleteRoute(route ?? null);
     setApiOpen(true);
-  };
-
-  const openPreviewComplete = (task: Task) => {
-    const item = previewRouteTasks.find(
-      (candidate) => candidate.task.id === task.id,
-    );
-    if (!item) return;
-    setPreviewContext(item);
-    setPreviewOpen(true);
   };
 
   const renderInspectionGroup = (inspection: InspectionRecord) => (
@@ -199,50 +186,56 @@ export function MyTasksPage() {
 
         <ApiTaskList
           tasks={inspection.tasks}
-          canComplete={(task) => canCompleteApiTask(authUser, task)}
-          onComplete={openApiComplete}
+          canComplete={(task) => canCompleteTask(authUser, task)}
+          onComplete={(task) => openApiComplete(task)}
         />
       </CardContent>
     </Card>
   );
 
   const renderRouteGroup = (group: RouteGroup) => {
-    const progress = getProgress(group.tasks);
+    const { route } = group;
+    const canExecute = ACTIVE_ROUTE_STATUSES.includes(route.status);
+
     return (
-      <Card key={group.key} className="border-border/80 bg-card/80 py-0">
+      <Card key={route.id} className="border-border/80 bg-card/80 py-0">
         <CardContent className="space-y-4 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-heading text-base font-semibold text-foreground">
-                  {group.route.code}
+                  {route.code}
                 </p>
-                <RouteStatusBadge status={group.route.status} />
+                <ApiRouteStatusBadge status={route.status} />
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {group.route.client?.name ?? 'Sin cliente'} ·{' '}
-                {group.route.asset?.manufacturer} {group.route.asset?.model}
+                {route.serviceOrder.clientName} · {route.serviceOrder.equipmentName}
               </p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Entrega: {formatDate(group.route.dueDate)}
+                ODS {route.serviceOrder.orderNumber}
+                {route.serviceOrder.dueAt
+                  ? ` · Entrega: ${formatDate(route.serviceOrder.dueAt)}`
+                  : ''}
               </p>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link to={`/hojas-de-ruta/${group.route.id}`}>
+              <Link to={`/hojas-de-ruta/${route.id}`}>
                 Abrir hoja completa <ArrowRight />
               </Link>
             </Button>
           </div>
 
           <ProgressBar
-            value={progress.progress}
-            label={`${progress.completed} de ${progress.total} tareas completadas`}
+            value={route.progress}
+            label={`${route.completedTasks} de ${route.totalTasks} tareas completadas`}
           />
 
-          <TaskList
-            tasks={group.tasks}
-            canComplete={(task) => canCompletePreviewTask(user, task)}
-            onComplete={openPreviewComplete}
+          <ApiTaskList
+            tasks={route.tasks}
+            canComplete={(task) =>
+              canExecute && canCompleteTask(authUser, task)
+            }
+            onComplete={(task) => openApiComplete(task, route)}
           />
         </CardContent>
       </Card>
@@ -256,7 +249,7 @@ export function MyTasksPage() {
         title="Mis tareas"
         description="Se muestra la hoja completa. Solo tus tareas de la etapa activa tienen el botón para marcar listo."
         actions={
-          user.role === 'ENGINEER' || user.role === 'QUALITY' ? (
+          authUser.role === 'ENGINEER' || authUser.role === 'QUALITY' ? (
             <Button variant="outline" asChild>
               <Link to="/hojas-de-ruta">
                 <ClipboardList /> Ver hojas de ruta
@@ -290,11 +283,11 @@ export function MyTasksPage() {
         />
       </div>
 
-      {isLoadingTasks && totalTasks === 0 && completedRoutes.length === 0 ? (
+      {isLoadingTasks && totalTasks === 0 ? (
         <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
           Cargando tareas…
         </p>
-      ) : totalTasks === 0 && completedRoutes.length === 0 ? (
+      ) : totalTasks === 0 ? (
         <EmptyState
           icon={CheckCircle2}
           title="¡Todo al día!"
@@ -302,18 +295,6 @@ export function MyTasksPage() {
         />
       ) : (
         <div className="space-y-8">
-          {apiInspections.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <ClipboardCheck className="size-4 text-info" />
-                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Inspecciones
-                </h2>
-              </div>
-              {apiInspections.map(renderInspectionGroup)}
-            </section>
-          )}
-
           {routeGroups.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
@@ -326,40 +307,15 @@ export function MyTasksPage() {
             </section>
           )}
 
-          {completedRoutes.length > 0 && (
+          {apiInspections.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-success" />
+                <ClipboardCheck className="size-4 text-info" />
                 <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Hojas completadas donde participé
+                  Inspecciones
                 </h2>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {completedRoutes.map((route) => (
-                  <div key={route.id} className="rounded-xl border border-border/70 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-foreground">{route.code}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {route.client?.name} · {route.asset?.model}
-                        </p>
-                      </div>
-                      <RouteStatusBadge status={route.status} />
-                    </div>
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                      {route.completedTasks} tareas ·{' '}
-                      {route.qualityApprovedAt
-                        ? 'Calidad aprobada'
-                        : 'Pendiente de calidad'}
-                    </p>
-                    <Button variant="outline" size="sm" asChild className="mt-3 w-full">
-                      <Link to={`/hojas-de-ruta/${route.id}`}>
-                        Ver hoja completa <ArrowRight />
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              {apiInspections.map(renderInspectionGroup)}
             </section>
           )}
         </div>
@@ -367,28 +323,21 @@ export function MyTasksPage() {
 
       <ApiCompleteTaskDialog
         open={apiOpen}
-        onOpenChange={setApiOpen}
+        onOpenChange={(open) => {
+          setApiOpen(open);
+          if (!open) setCompleteRoute(null);
+        }}
         task={apiTask}
         inspection={
           apiTask?.inspectionId
             ? inspectionsById.get(apiTask.inspectionId) ?? null
             : null
         }
+        routeSheet={completeRoute}
         pending={completeApiMutation.isPending}
         onSubmit={(payload) => {
           if (!apiTask) return;
           completeApiMutation.mutate({ taskId: apiTask.id, payload });
-        }}
-      />
-
-      <CompleteTaskDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        context={previewContext}
-        onSubmit={(payload) => {
-          if (!previewContext) return;
-          completePreviewTask(previewContext.task.id, user.id, payload);
-          toast.success('Tarea marcada como lista. La etapa siguiente se desbloqueó.');
         }}
       />
     </div>

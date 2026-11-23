@@ -12,6 +12,7 @@ import { InspectionsModule } from './inspections/inspections.module.js';
 import { ResponseInterceptor } from './interceptors/responde.interceptor.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { RouteSheetsModule } from './route-sheets/route-sheets.module.js';
 import { ServiceOrdersModule } from './service-orders/service-orders.module.js';
 import { SitesModule } from './sites/sites.module.js';
 import { TasksModule } from './tasks/tasks.module.js';
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module.js';
     ProjectsModule,
     ServiceOrdersModule,
     InspectionsModule,
+    RouteSheetsModule,
     TasksModule,
   ],
   providers: [

@@ -143,14 +143,26 @@ export class TasksService {
       throw new NotFoundException('Tarea no encontrada');
     }
 
+    if (task.routeSheetId) {
+      return this.completeRouteTask(task, actor, input);
+    }
+
     if (!task.inspectionId) {
       throw new BadRequestException(
-        'La ejecución de tareas de hoja de ruta se conectará en la siguiente fase',
+        'La tarea no pertenece a una inspección ni a una hoja de ruta',
       );
     }
 
+    return this.completeInspectionTask(task, actor, input);
+  }
+
+  private async completeInspectionTask(
+    task: TaskWithRelations,
+    actor: AuthUser,
+    input: CompleteTaskInput,
+  ): Promise<TaskRecord> {
     const inspection = await this.prisma.inspection.findUnique({
-      where: { id: task.inspectionId },
+      where: { id: task.inspectionId as string },
       include: {
         tasks: { select: { id: true, stage: true, status: true } },
         serviceOrder: { select: { id: true, status: true } },
@@ -166,62 +178,21 @@ export class TasksService {
     }
 
     const siblings: TaskSibling[] = inspection.tasks;
-    const blocked = isTaskBlocked(siblings, {
-      stage: task.stage,
-      status: task.status,
-    });
-
-    const allowed = canCompleteTask(
-      {
-        id: actor.id,
-        role: actor.role,
-        jobPositionId: actor.jobPositionId ?? null,
-      },
-      {
-        status: task.status as TaskStatus,
-        assignedToId: task.assignedToId,
-        jobPositionId: task.jobPositionId,
-        blocked,
-      },
-    );
-
-    if (!allowed) {
-      throw new ForbiddenException('No puedes completar esta tarea');
-    }
-
-    if (
-      task.requiresEvidence &&
-      !input.evidenceUrl &&
-      task.attachments.length === 0
-    ) {
-      throw new BadRequestException(
-        'Esta tarea requiere una evidencia antes de marcarse como completada',
-      );
-    }
+    this.ensureTaskCanBeCompleted(task, siblings, actor);
+    this.ensureTaskEvidence(task, input);
 
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({
-        where: { id: taskId },
-        data: {
-          status: 'COMPLETED',
-          startedAt: task.startedAt ?? now,
-          completedAt: now,
-          ...(input.observations
-            ? {
-                notes: task.notes
-                  ? `${task.notes}\n${input.observations}`
-                  : input.observations,
-              }
-            : {}),
-        },
+        where: { id: task.id },
+        data: this.completionData(task, input, now),
       });
 
       if (input.evidenceUrl) {
         await tx.taskAttachment.create({
           data: {
-            taskId,
+            taskId: task.id,
             url: input.evidenceUrl,
             type: 'PHOTO',
             uploadedById: actor.id,
@@ -257,7 +228,7 @@ export class TasksService {
       userId: actor.id,
       action: 'COMPLETE',
       entity: 'Task',
-      entityId: taskId,
+      entityId: task.id,
       changes: {
         after: {
           status: 'COMPLETED',
@@ -267,6 +238,163 @@ export class TasksService {
       },
     });
 
+    return this.findTaskRecord(task.id, updatedTasks);
+  }
+
+  private async completeRouteTask(
+    task: TaskWithRelations,
+    actor: AuthUser,
+    input: CompleteTaskInput,
+  ): Promise<TaskRecord> {
+    const route = await this.prisma.routeSheet.findUnique({
+      where: { id: task.routeSheetId as string },
+      include: {
+        tasks: { select: { id: true, stage: true, status: true } },
+        serviceOrder: { select: { id: true, status: true } },
+      },
+    });
+
+    if (!route) {
+      throw new NotFoundException('Hoja de ruta no encontrada');
+    }
+
+    if (!['RELEASED', 'IN_PROGRESS'].includes(route.status)) {
+      throw new BadRequestException(
+        'La hoja de ruta todavía no está liberada para ejecución',
+      );
+    }
+
+    const siblings: TaskSibling[] = route.tasks;
+    this.ensureTaskCanBeCompleted(task, siblings, actor);
+    this.ensureTaskEvidence(task, input);
+
+    const now = new Date();
+    const updatedTasks = route.tasks.map((candidate) =>
+      candidate.id === task.id
+        ? { ...candidate, status: 'COMPLETED' as const }
+        : candidate,
+    );
+    const stillOpen = updatedTasks.some(
+      (candidate) =>
+        candidate.status !== 'COMPLETED' && candidate.status !== 'CANCELLED',
+    );
+    const nextStatus = stillOpen ? 'IN_PROGRESS' : 'PENDING_ANNEX_REVIEW';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.task.update({
+        where: { id: task.id },
+        data: this.completionData(task, input, now),
+      });
+
+      if (input.evidenceUrl) {
+        await tx.taskAttachment.create({
+          data: {
+            taskId: task.id,
+            url: input.evidenceUrl,
+            type: 'PHOTO',
+            uploadedById: actor.id,
+          },
+        });
+      }
+
+      await tx.routeSheet.update({
+        where: { id: route.id },
+        data: { status: nextStatus },
+      });
+
+      if (route.serviceOrder.status === 'OPEN') {
+        await tx.serviceOrder.update({
+          where: { id: route.serviceOrder.id },
+          data: { status: 'IN_PROGRESS' },
+        });
+      }
+    });
+
+    await this.audit.record({
+      userId: actor.id,
+      action: 'COMPLETE',
+      entity: 'Task',
+      entityId: task.id,
+      changes: {
+        after: {
+          status: 'COMPLETED',
+          routeSheetId: route.id,
+          routeSheetStatus: nextStatus,
+          evidence: Boolean(input.evidenceUrl),
+        },
+      },
+    });
+
+    return this.findTaskRecord(task.id, updatedTasks);
+  }
+
+  private ensureTaskCanBeCompleted(
+    task: TaskWithRelations,
+    siblings: readonly TaskSibling[],
+    actor: AuthUser,
+  ): void {
+    const blocked = isTaskBlocked(siblings, {
+      stage: task.stage,
+      status: task.status,
+    });
+
+    const allowed = canCompleteTask(
+      {
+        id: actor.id,
+        role: actor.role,
+        jobPositionId: actor.jobPositionId ?? null,
+      },
+      {
+        status: task.status as TaskStatus,
+        assignedToId: task.assignedToId,
+        jobPositionId: task.jobPositionId,
+        blocked,
+      },
+    );
+
+    if (!allowed) {
+      throw new ForbiddenException('No puedes completar esta tarea');
+    }
+  }
+
+  private ensureTaskEvidence(
+    task: TaskWithRelations,
+    input: CompleteTaskInput,
+  ): void {
+    if (
+      task.requiresEvidence &&
+      !input.evidenceUrl &&
+      task.attachments.length === 0
+    ) {
+      throw new BadRequestException(
+        'Esta tarea requiere una evidencia antes de marcarse como completada',
+      );
+    }
+  }
+
+  private completionData(
+    task: TaskWithRelations,
+    input: CompleteTaskInput,
+    now: Date,
+  ) {
+    return {
+      status: 'COMPLETED' as const,
+      startedAt: task.startedAt ?? now,
+      completedAt: now,
+      ...(input.observations
+        ? {
+            notes: task.notes
+              ? `${task.notes}\n${input.observations}`
+              : input.observations,
+          }
+        : {}),
+    };
+  }
+
+  private async findTaskRecord(
+    taskId: string,
+    siblings: readonly TaskSibling[],
+  ): Promise<TaskRecord> {
     const updated = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: TASK_INCLUDE,
@@ -276,7 +404,7 @@ export class TasksService {
       throw new NotFoundException('Tarea no encontrada');
     }
 
-    return toTaskRecord(updated, updatedTasks);
+    return toTaskRecord(updated, siblings);
   }
 
   private async loadSiblings(
