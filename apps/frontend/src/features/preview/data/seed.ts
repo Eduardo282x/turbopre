@@ -32,15 +32,15 @@ const EVIDENCE = `data:image/svg+xml;utf8,${encodeURIComponent(
 )}`;
 
 export const USERS: User[] = [
-  { id: 'u-admin', name: 'Ana Rivas', username: 'ana.rivas', password: DEMO_PASSWORD, email: 'ana.rivas@turbopre.com', role: 'GLOBAL', active: true, createdAt: shiftDays(-420) },
+  { id: 'u-admin', name: 'Ana Rivas', username: 'ana.rivas', password: DEMO_PASSWORD, email: 'ana.rivas@turbopre.com', role: 'ADMIN', active: true, createdAt: shiftDays(-420) },
   { id: 'u-sales', name: 'María Pérez', username: 'maria.perez', password: DEMO_PASSWORD, email: 'maria.perez@turbopre.com', role: 'SALES', active: true, createdAt: shiftDays(-380) },
   { id: 'u-sales-2', name: 'Carlos Gutiérrez', username: 'carlos.gutierrez', password: DEMO_PASSWORD, email: 'carlos.gutierrez@turbopre.com', role: 'SALES', active: true, createdAt: shiftDays(-360) },
   { id: 'u-workshop', name: 'Ricardo Bonilla', username: 'ricardo.bonilla', password: DEMO_PASSWORD, email: 'ricardo.bonilla@turbopre.com', role: 'WORKSHOP', active: true, createdAt: shiftDays(-350) },
-  { id: 'u-eng-1', name: 'Luis Herrera', username: 'luis.herrera', password: DEMO_PASSWORD, email: 'luis.herrera@turbopre.com', role: 'ENGINEERING', positionId: 'eng_plans', active: true, createdAt: shiftDays(-340) },
-  { id: 'u-eng-2', name: 'Ariannys Bucobo', username: 'ariannys.bucobo', password: DEMO_PASSWORD, email: 'ariannys.bucobo@turbopre.com', role: 'ENGINEERING', positionId: 'eng_pmi', active: true, createdAt: shiftDays(-330) },
+  { id: 'u-eng-1', name: 'Luis Herrera', username: 'luis.herrera', password: DEMO_PASSWORD, email: 'luis.herrera@turbopre.com', role: 'ENGINEER', positionId: 'eng_plans', active: true, createdAt: shiftDays(-340) },
+  { id: 'u-eng-2', name: 'Ariannys Bucobo', username: 'ariannys.bucobo', password: DEMO_PASSWORD, email: 'ariannys.bucobo@turbopre.com', role: 'ENGINEER', positionId: 'eng_pmi', active: true, createdAt: shiftDays(-330) },
   { id: 'u-quality-1', name: 'Valentina Suárez', username: 'valentina.suarez', password: DEMO_PASSWORD, email: 'valentina.suarez@turbopre.com', role: 'QUALITY', positionId: 'quality_inspector', active: true, createdAt: shiftDays(-320) },
   { id: 'u-quality-2', name: 'Héctor Mendoza', username: 'hector.mendoza', password: DEMO_PASSWORD, email: 'hector.mendoza@turbopre.com', role: 'QUALITY', positionId: 'quality_inspector', active: true, createdAt: shiftDays(-310) },
-  { id: 'u-project', name: 'Rafael Paredes', username: 'rafael.paredes', password: DEMO_PASSWORD, email: 'rafael.paredes@turbopre.com', role: 'PROJECT', active: true, createdAt: shiftDays(-300) },
+  { id: 'u-project', name: 'Rafael Paredes', username: 'rafael.paredes', password: DEMO_PASSWORD, email: 'rafael.paredes@turbopre.com', role: 'PROJECT_MANAGER', active: true, createdAt: shiftDays(-300) },
   { id: 'u-warehouse-1', name: 'Juan Almacén', username: 'juan.almacen', password: DEMO_PASSWORD, email: 'juan.almacen@turbopre.com', role: 'WAREHOUSE', active: true, createdAt: shiftDays(-290) },
   { id: 'u-warehouse-2', name: 'Marta Almacén', username: 'marta.almacen', password: DEMO_PASSWORD, email: 'marta.almacen@turbopre.com', role: 'WAREHOUSE', active: true, createdAt: shiftDays(-280) },
   { id: 'u-op-rot-1', name: 'Pedro Salas', username: 'pedro.salas', password: DEMO_PASSWORD, email: 'pedro.salas@turbopre.com', role: 'OPERATOR', positionId: 'rotating_specialist', active: true, createdAt: shiftDays(-270) },

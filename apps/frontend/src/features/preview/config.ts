@@ -101,7 +101,7 @@ export function getPositionsForRole(role: RoleId): Position[] {
   if (role === 'OPERATOR') {
     return POSITIONS.filter((position) => ['rotating', 'machining', 'generators', 'welding'].includes(position.processId));
   }
-  if (role === 'ENGINEERING') {
+  if (role === 'ENGINEER') {
     return POSITIONS.filter((position) => position.processId === 'engineering');
   }
   if (role === 'QUALITY') {
@@ -111,13 +111,13 @@ export function getPositionsForRole(role: RoleId): Position[] {
 }
 
 export const ROLE_OPTIONS: Array<{ id: RoleId; label: string; description: string }> = [
-  { id: 'GLOBAL', label: 'Administrador / Super usuario', description: 'Ve todo el sistema, administra usuarios y puede intervenir en cualquier flujo.' },
+  { id: 'ADMIN', label: 'Administrador / Super usuario', description: 'Ve todo el sistema, administra usuarios y puede intervenir en cualquier flujo.' },
   { id: 'SALES', label: 'Mercadeo y Ventas', description: 'Crea órdenes de servicio, gestiona clientes y confirma entregas.' },
   { id: 'WORKSHOP', label: 'Servicio de Taller', description: 'Recibe la ODS, crea inspecciones, aprueba su alcance y coordina la ejecución.' },
-  { id: 'ENGINEERING', label: 'Ingeniería y Soporte Técnico', description: 'Crea la hoja de ruta, define tareas por puesto, revisa anexos y ejecuta tareas técnicas.' },
+  { id: 'ENGINEER', label: 'Ingeniería y Soporte Técnico', description: 'Crea la hoja de ruta, define tareas por puesto, revisa anexos y ejecuta tareas técnicas.' },
   { id: 'OPERATOR', label: 'Operador de Taller', description: 'Ejecuta las tareas de su puesto dentro de la hoja de ruta.' },
   { id: 'QUALITY', label: 'Calidad', description: 'Ejecuta tareas de inspección y da el visto bueno final de la hoja de ruta.' },
-  { id: 'PROJECT', label: 'Gerente de Proyecto', description: 'Aprueba la hoja de ruta antes de liberarla, da seguimiento y ve rendimiento.' },
+  { id: 'PROJECT_MANAGER', label: 'Gerente de Proyecto', description: 'Aprueba la hoja de ruta antes de liberarla, da seguimiento y ve rendimiento.' },
   { id: 'WAREHOUSE', label: 'Almacén', description: 'Gestiona inventario, solicitudes, préstamos y calibración.' },
 ];
 
@@ -126,13 +126,13 @@ export const ROLE_BY_ID = Object.fromEntries(
 ) as Record<RoleId, (typeof ROLE_OPTIONS)[number]>;
 
 export const ROLE_COLORS: Record<RoleId, string> = {
-  GLOBAL: '#a855f7',
+  ADMIN: '#a855f7',
   SALES: '#d946ef',
   WORKSHOP: '#22c55e',
-  ENGINEERING: '#00d1ff',
+  ENGINEER: '#00d1ff',
   OPERATOR: '#ffb020',
   QUALITY: '#ec4899',
-  PROJECT: '#f472b6',
+  PROJECT_MANAGER: '#f472b6',
   WAREHOUSE: '#14b8a6',
 };
 
@@ -280,12 +280,15 @@ export function getPositionShortName(positionId?: PositionId): string {
 }
 
 export function getRoleLabel(role: RoleId): string {
-  return ROLE_BY_ID[role].label;
+  return ROLE_BY_ID[role]?.label ?? role;
 }
 
 export function getRoleDisplay(user: Pick<User, 'role' | 'positionId'>): string {
-  if (user.positionId) {
-    return `${getPositionShortName(user.positionId)} · ${getProcessShortName(POSITION_BY_ID[user.positionId].processId)}`;
+  const position = user.positionId ? POSITION_BY_ID[user.positionId] : undefined;
+
+  if (position) {
+    return `${position.shortName} · ${getProcessShortName(position.processId)}`;
   }
+
   return getRoleLabel(user.role);
 }

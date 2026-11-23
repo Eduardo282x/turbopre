@@ -1391,6 +1391,6 @@ export const usePreviewStore = create<PreviewStore>()(
         });
       },
     }),
-    { name: 'turbopre.cami.preview.v2' },
+    { name: 'turbopre.cami.preview.v3' },
   ),
 );

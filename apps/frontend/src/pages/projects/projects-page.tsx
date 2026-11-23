@@ -48,7 +48,7 @@ export function ProjectsPage() {
   const projects = getProjectsWithRelations(db);
   const active = projects.filter((project) => project.phase !== 'CLOSED').length;
   const completed = projects.filter((project) => project.phase === 'CLOSED').length;
-  const engineers = db.users.filter((candidate) => candidate.role === 'ENGINEERING');
+  const engineers = db.users.filter((candidate) => candidate.role === 'ENGINEER');
 
   const columns: DataTableColumn<ProjectRow>[] = [
     {

@@ -8,18 +8,11 @@ import { PageHeader } from '@/components/common/page-header';
 import { RoleBadge } from '@/components/common/role-badge';
 import { SectionCard } from '@/components/common/section-card';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { getPositionName, getRoleDisplay } from '@/features/preview/config';
-import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
+import { getPositionName } from '@/features/preview/config';
+import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
 import { getInitials } from '@/lib/formatters';
-import { isPreviewMode } from '@/lib/preview';
+import { useAuthStore } from '@/stores/use-auth-store';
 
 const themes = [
   { id: 'dark', label: 'Oscuro', icon: Moon },
@@ -31,15 +24,12 @@ export function SettingsPage() {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
   const resetPreview = usePreviewStore((state) => state.resetPreview);
-  const signOut = usePreviewSession((state) => state.signOut);
-  const switchUser = usePreviewSession((state) => state.switchUser);
+  const signOut = useAuthStore((state) => state.signOut);
   const { theme, setTheme } = useTheme();
   const [resetOpen, setResetOpen] = useState(false);
   const navigate = useNavigate();
 
   if (!user) return null;
-
-  const sortedUsers = [...db.users].sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
   return (
     <div className="space-y-6">
@@ -79,27 +69,6 @@ export function SettingsPage() {
               <LogOut /> Cerrar sesión
             </Button>
           </div>
-
-          {isPreviewMode && (
-            <div className="mt-5 space-y-2 rounded-xl border border-info/30 bg-info/5 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-info">Herramienta de QA</p>
-              <p className="text-[11px] text-muted-foreground">
-                En desarrollo puedes cambiar de usuario para revisar cada rol. En producción este control no aparece.
-              </p>
-              <Select value={user.id} onValueChange={(value) => switchUser(value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedUsers.map((candidate) => (
-                    <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.name} · {getRoleDisplay(candidate)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </SectionCard>
 
         <SectionCard title="Tema de la interfaz" description="Los tres temas usan tokens semánticos y se guardan en el navegador.">

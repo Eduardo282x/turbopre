@@ -150,7 +150,7 @@ export function MyTasksPage() {
         title="Mis tareas"
         description="Se muestra la hoja completa. Solo tus tareas de la etapa activa tienen el botón para marcar listo."
         actions={
-          user.role === 'ENGINEERING' || user.role === 'QUALITY' ? (
+          user.role === 'ENGINEER' || user.role === 'QUALITY' ? (
             <Button variant="outline" asChild>
               <Link to="/hojas-de-ruta">
                 <ClipboardList /> Ver hojas de ruta

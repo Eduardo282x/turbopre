@@ -10,10 +10,11 @@ interface RoleBadgeProps {
 }
 
 export function RoleBadge({ role, positionId, className }: RoleBadgeProps) {
-  const color = ROLE_COLORS[role];
-  const label = positionId
-    ? `${POSITION_BY_ID[positionId].shortName} · ${getProcessShortName(POSITION_BY_ID[positionId].processId)}`
-    : ROLE_BY_ID[role].label;
+  const color = ROLE_COLORS[role] ?? '#71717a';
+  const position = positionId ? POSITION_BY_ID[positionId] : undefined;
+  const label = position
+    ? `${position.shortName} · ${getProcessShortName(position.processId)}`
+    : ROLE_BY_ID[role]?.label ?? role;
 
   return (
     <Badge

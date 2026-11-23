@@ -461,6 +461,7 @@ model Inspection {
   createdBy    User         @relation("InspectionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   approvedBy   User?        @relation("InspectionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
   tasks        Task[]
+  routeSheets  RouteSheet[]
 
   @@index([serviceOrderId])
   @@index([createdById])
@@ -480,6 +481,7 @@ model Task {
   assignedToId     String?    @map("assigned_to_id")
   createdById      String     @map("created_by_id")
   sequence         Int?
+  stage            Int        @default(1)
   source           TaskSource @default(ROUTE_SHEET)
   description      String
   status           TaskStatus @default(PENDING)
@@ -492,7 +494,7 @@ model Task {
   updatedAt        DateTime   @updatedAt @map("updated_at")
 
   inspection  Inspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
-  routeSheet  RouteSheet? @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  routeSheet  RouteSheet? @relation(fields: [routeSheetId], references: [id], onDelete: SetNull)
   jobPosition JobPosition @relation(fields: [jobPositionId], references: [id], onDelete: Restrict)
   assignedTo  User?       @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdBy   User        @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
@@ -500,7 +502,7 @@ model Task {
   attachments TaskAttachment[]
 
   @@index([inspectionId])
-  @@index([routeSheetId, sequence])
+  @@index([routeSheetId, stage, sequence])
   @@index([jobPositionId])
   @@index([assignedToId])
   @@index([status])
@@ -540,6 +542,7 @@ model RouteSheet {
   id                String           @id @default(cuid())
   code              String           @unique
   serviceOrderId    String           @unique @map("service_order_id")
+  inspectionId      String?          @map("inspection_id")
   createdById       String           @map("created_by_id")
   status            RouteSheetStatus @default(DRAFT)
   currentLocationId String?          @map("current_location_id")
@@ -550,6 +553,7 @@ model RouteSheet {
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
   serviceOrder    ServiceOrder   @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  inspection      Inspection?    @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   createdBy       User           @relation("RouteSheetCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   currentLocation PlantLocation? @relation(fields: [currentLocationId], references: [id], onDelete: SetNull)
 
@@ -560,6 +564,7 @@ model RouteSheet {
   materialRequests MaterialRequest[]
 
   @@index([createdById])
+  @@index([inspectionId])
   @@index([status])
   @@index([currentLocationId])
   @@map("route_sheets")

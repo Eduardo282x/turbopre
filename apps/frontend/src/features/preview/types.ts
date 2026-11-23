@@ -1,3 +1,5 @@
+import type { UserRole } from '@turbopre/shared';
+
 /**
  * Modelo provisional del frontend CAMI (modo preview).
  *
@@ -8,15 +10,8 @@
  * tipos se reemplazan por los contratos de packages/shared + services/<dominio>.
  */
 
-export type RoleId =
-  | 'GLOBAL'
-  | 'SALES'
-  | 'WORKSHOP'
-  | 'ENGINEERING'
-  | 'OPERATOR'
-  | 'QUALITY'
-  | 'PROJECT'
-  | 'WAREHOUSE';
+/** Los roles canónicos viven en `@turbopre/shared`. */
+export type RoleId = UserRole;
 
 export type ProcessId =
   | 'rotating'

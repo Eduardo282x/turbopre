@@ -95,7 +95,7 @@ export function ServiceOrderDetailPage() {
 
   const canEdit =
     canManageServiceOrders(user) &&
-    (user.role === 'GLOBAL' || (!order.inspectionId && !order.routeSheetId));
+    (user.role === 'ADMIN' || (!order.inspectionId && !order.routeSheetId));
 
   return (
     <div className="space-y-6">

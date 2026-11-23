@@ -24,6 +24,12 @@ export const authUserSchema = z.object({
   name: z.string(),
   email: z.email().nullable(),
   role: userRoleSchema,
+  jobPositionId: z.string().nullable().optional(),
+  jobPositionCode: z.string().nullable().optional(),
+  jobPositionName: z.string().nullable().optional(),
+  processId: z.string().nullable().optional(),
+  processCode: z.string().nullable().optional(),
+  processName: z.string().nullable().optional(),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 
@@ -48,5 +54,11 @@ export const jwtPayloadSchema = z.object({
   name: z.string(),
   email: z.email().nullable(),
   role: userRoleSchema,
+  jobPositionId: z.string().nullable().optional(),
+  jobPositionCode: z.string().nullable().optional(),
+  jobPositionName: z.string().nullable().optional(),
+  processId: z.string().nullable().optional(),
+  processCode: z.string().nullable().optional(),
+  processName: z.string().nullable().optional(),
 });
 export type JwtPayload = z.infer<typeof jwtPayloadSchema>;

@@ -40,6 +40,12 @@ export class JwtAuthGuard implements CanActivate {
         name: payload.name,
         email: payload.email,
         role: payload.role,
+        jobPositionId: payload.jobPositionId ?? null,
+        jobPositionCode: payload.jobPositionCode ?? null,
+        jobPositionName: payload.jobPositionName ?? null,
+        processId: payload.processId ?? null,
+        processCode: payload.processCode ?? null,
+        processName: payload.processName ?? null,
       };
     } catch {
       throw new UnauthorizedException('Token de acceso inválido o expirado');

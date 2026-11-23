@@ -291,8 +291,8 @@ export function isTaskMine(task: Task, user: User): boolean {
 }
 
 export function getMyTasks(db: PreviewDatabase, user: User): TaskWithContext[] {
-  if (user.role === 'GLOBAL') return [];
-  if (!['OPERATOR', 'ENGINEERING', 'QUALITY'].includes(user.role)) return [];
+  if (user.role === 'ADMIN') return [];
+  if (!['OPERATOR', 'ENGINEER', 'QUALITY'].includes(user.role)) return [];
   return getTaskContexts(db)
     .filter((context) => context.task.status !== 'COMPLETED' && isTaskMine(context.task, user))
     .sort((a, b) => {

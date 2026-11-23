@@ -183,7 +183,7 @@ export function ServiceOrdersPage() {
             icon: Pencil,
             hidden: (order) =>
               !canManageServiceOrders(user) ||
-              (user.role !== 'GLOBAL' && Boolean(order.inspectionId || order.routeSheetId)),
+              (user.role !== 'ADMIN' && Boolean(order.inspectionId || order.routeSheetId)),
             onSelect: (order) => {
               setEditing(order);
               setFormOpen(true);

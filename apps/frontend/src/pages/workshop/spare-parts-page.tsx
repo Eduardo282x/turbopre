@@ -171,7 +171,7 @@ export function SparePartsPage() {
           <p className="flex-1 text-foreground">
             Hay <strong>{inProcure}</strong> ítem(s) en Procura. El almacén los agregará al inventario cuando lleguen.
           </p>
-          {user.role === 'GLOBAL' && (
+          {user.role === 'ADMIN' && (
             <Button variant="outline" size="sm" asChild>
               <Link to="/almacen/solicitudes">
                 <CheckCircle2 /> Ver solicitudes

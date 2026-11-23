@@ -50,7 +50,7 @@ import { daysUntil, formatDate } from '@/lib/formatters';
 import { canManageRoutes } from '@/lib/permissions';
 
 const rolePrompts = {
-  GLOBAL: {
+  ADMIN: {
     title: 'Visión global del sistema',
     description: 'Todas las órdenes, inspecciones y hojas de ruta en un solo lugar.',
     action: 'Ver órdenes de servicio',
@@ -62,7 +62,7 @@ const rolePrompts = {
     action: 'Ver inspecciones',
     to: '/taller/inspecciones',
   },
-  ENGINEERING: {
+  ENGINEER: {
     title: 'Ingeniería y soporte técnico',
     description: 'Crea hojas de ruta desde inspecciones aprobadas y coordina la ejecución técnica.',
     action: 'Ver inspecciones aprobadas',
@@ -80,7 +80,7 @@ const rolePrompts = {
     action: 'Ver hojas en calidad',
     to: '/hojas-de-ruta',
   },
-  PROJECT: {
+  PROJECT_MANAGER: {
     title: 'Aprobación y seguimiento',
     description: 'Aprueba las hojas antes de liberarlas y sigue el rendimiento de la planta.',
     action: 'Ver aprobaciones',
@@ -208,21 +208,21 @@ export function DashboardPage() {
         description="Visión general de órdenes de servicio, inspecciones, hojas de ruta y compromisos de entrega."
         actions={
           <>
-            {user.role === 'ENGINEERING' && canManageRoutes(user) && (
+            {user.role === 'ENGINEER' && canManageRoutes(user) && (
               <Button asChild>
                 <Link to="/hojas-de-ruta/nueva">
                   <Plus /> Nueva hoja de ruta
                 </Link>
               </Button>
             )}
-            {(user.role === 'OPERATOR' || user.role === 'QUALITY' || user.role === 'ENGINEERING') && (
+            {(user.role === 'OPERATOR' || user.role === 'QUALITY' || user.role === 'ENGINEER') && (
               <Button variant="outline" asChild>
                 <Link to="/mis-tareas">
                   <ClipboardList /> Mis tareas
                 </Link>
               </Button>
             )}
-            {user.role === 'PROJECT' && (
+            {user.role === 'PROJECT_MANAGER' && (
               <Button asChild>
                 <Link to="/aprobaciones">
                   <BadgeCheck /> Aprobaciones
@@ -288,9 +288,9 @@ export function DashboardPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{myTasks.length} tareas</Badge>
-              {user.role === 'PROJECT' && <Badge variant="outline">{approvals.length} aprobaciones</Badge>}
-              {(user.role === 'QUALITY' || user.role === 'GLOBAL') && <Badge variant="outline">{qualityQueue.length} en calidad</Badge>}
-              {user.role === 'ENGINEERING' && (
+              {user.role === 'PROJECT_MANAGER' && <Badge variant="outline">{approvals.length} aprobaciones</Badge>}
+              {(user.role === 'QUALITY' || user.role === 'ADMIN') && <Badge variant="outline">{qualityQueue.length} en calidad</Badge>}
+              {user.role === 'ENGINEER' && (
                 <Badge variant="outline">{approvedInspections.length} inspecciones sin hoja</Badge>
               )}
               {user.role === 'WORKSHOP' && (

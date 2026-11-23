@@ -28,7 +28,7 @@ pnpm install            # instala todo el workspace y genera el cliente Prisma
 cp apps/backend/.env.example apps/backend/.env
 # ajusta DATABASE_URL en apps/backend/.env
 pnpm db:migrate         # crea las tablas
-pnpm db:seed            # crea catálogos y el administrador
+pnpm db:seed            # crea catálogos, el administrador y usuarios demo de QA
 pnpm dev                # frontend en :5173 y API en :3000
 ```
 
@@ -36,10 +36,12 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 
 | Usuario | Contraseña |
 | --- | --- |
-| `admin` | `Admin123!` |
+| `admin` | `admin1234` |
 
-> El administrador y los catálogos se crean con `pnpm db:seed`. No hay modo demo:
-> el login siempre valida contra PostgreSQL.
+> El administrador y los catálogos se crean con `pnpm db:seed`. En desarrollo
+> también se crean usuarios demo (uno por rol) con contraseña `demo1234`; en
+> producción se omiten salvo que definas `SEED_DEMO_USERS=true`. El login
+> siempre valida contra PostgreSQL.
 
 ## Scripts (raíz)
 
@@ -60,7 +62,13 @@ Abre <http://localhost:5173> e inicia sesión con el usuario administrador semil
 | --- | --- | --- |
 | `GET` | `/api/health` | Estado de la API; `data` contiene `{ status, service, version, uptime, timestamp }`. |
 | `POST` | `/api/auth/login` | Login con `{ username, password }`; `data` contiene `{ accessToken, user }`. |
-| `GET` | `/api/auth/me` | Usuario del token (`Authorization: Bearer …`); `data` contiene el usuario. |
+| `GET` | `/api/auth/me` | Revalida el usuario del token contra la BD; `data` contiene el usuario con su puesto y proceso. |
+| `GET` | `/api/users` | Lista de usuarios. Solo `ADMIN`. Admite `?search=`. |
+| `POST` | `/api/users` | Crea un usuario. Solo `ADMIN`. |
+| `PATCH` | `/api/users/:id` | Actualiza rol, puesto o estado. Solo `ADMIN`. |
+| `POST` | `/api/users/:id/password` | Restablece la contraseña. Solo `ADMIN`. |
+| `GET` | `/api/catalogs` | Departamentos, procesos, puestos y ubicaciones. Cualquier usuario autenticado. |
+| `POST/PATCH` | `/api/catalogs/...` | Altas y ediciones de catálogos. Solo `ADMIN`. |
 
 ### Formato de respuesta
 

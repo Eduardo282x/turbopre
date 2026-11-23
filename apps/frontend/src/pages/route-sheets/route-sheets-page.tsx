@@ -142,7 +142,7 @@ export function RouteSheetsPage() {
         <KpiCard label="Por entregar" value={metrics.readyForDelivery} hint="Listas para el cliente" icon={CheckCircle2} tone="success" />
       </div>
 
-      {metrics.inQuality > 0 && (user.role === 'QUALITY' || user.role === 'GLOBAL') && (
+      {metrics.inQuality > 0 && (user.role === 'QUALITY' || user.role === 'ADMIN') && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
           <CheckCircle2 className="size-5 text-warning" />
           <p className="flex-1 text-foreground">

@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRoleDisplay } from '@/features/preview/config';
 import { getMyTasks, getPendingApprovals, getQualityQueue, getWarehousePendingItems } from '@/features/preview/store/selectors';
-import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
+import { useCurrentUser } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { useAuthStore } from '@/stores/use-auth-store';
 import { getInitials } from '@/lib/formatters';
 import { getNavigationForRole, type NavBadge } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
@@ -23,7 +24,7 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed = false, onToggleCollapse, onNavigate, className }: AppSidebarProps) {
   const user = useCurrentUser();
   const db = usePreviewStore((state) => state.db);
-  const signOut = usePreviewSession((state) => state.signOut);
+  const signOut = useAuthStore((state) => state.signOut);
   const navigate = useNavigate();
 
   if (!user) return null;

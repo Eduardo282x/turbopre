@@ -71,41 +71,41 @@ src/
 
 - El token vive en `useAuthStore` (persistido) y el interceptor de Axios lo
   adjunta. Ante un `401` el interceptor cierra sesión y redirige a `/login`.
-- El frontend sigue en **modo preview** y no consume el backend. La sesión y los
-  datos viven en `src/features/preview/` (zustand + `localStorage`).
-- El login del preview valida usuario y contraseña contra la semilla
-  (`demo1234`). El administrador crea usuarios y entrega sus credenciales.
-- En desarrollo/QA se muestran accesos rápidos y cambio de usuario para probar
-  cada rol. En producción esos controles no aparecen (ver `isPreviewMode`).
+- El login es **real** contra `POST /api/auth/login` y usa `loginSchema` de
+  `@turbopre/shared`. `ProtectedRoute` revalida la sesión con `/auth/me`.
+- `useCurrentUser` (en `features/preview/store/preview-session.ts`) devuelve un
+  usuario compatible con el modelo preview a partir del JWT. Mientras queden
+  módulos sin migrar, los usuarios demo del seed usan los mismos IDs que la
+  semilla del preview para que las tareas sigan cuadrando.
+- En desarrollo/QA se muestran accesos rápidos y cambio de usuario; ambos hacen
+  login real con los usuarios sembrados (`demo1234`). En producción no aparecen
+  (ver `isPreviewMode`).
 
-## Modo preview (estado actual)
+## Estado de la migración (Fase 1)
 
-- El frontend de CAMI **no** consume el backend. La sesión y los datos viven en
-  `src/features/preview/` (zustand + `localStorage`).
+- **Conectado a la API**: login, `/auth/me`, sesión, usuarios y catálogos.
+- **Sigue en preview** (`src/features/preview/`, zustand + `localStorage`):
+  órdenes de servicio, inspecciones, hojas de ruta, tareas, repuestos,
+  proyectos, inventario, solicitudes, préstamos, calibración, rendimiento,
+  mapa de planta, auditoría y configuración de datos demo.
+- Los roles son los canónicos del backend: Administrador (`ADMIN`), Ventas,
+  Taller, Ingeniería (`ENGINEER`), Operador, Calidad, Gerente de Proyecto
+  (`PROJECT_MANAGER`) y Almacén.
+- La matriz de permisos vive en `@turbopre/shared`; `src/lib/permissions.ts`
+  solo adapta los tipos provisionales.
 - La columna vertebral es **ODS → Inspección → Hoja de ruta → Anexos → Calidad →
-  Entrega**. La entidad de entrada es la **Orden de Servicio** (`ServiceOrder`),
-  no el antiguo “expediente” con modos `SHOP/FIELD/PROJECT/SUPPLY`.
-- Roles del preview: Administrador (`GLOBAL`), Ventas, Taller, Ingeniería,
-  Operador, Calidad, Gerente de Proyecto y Almacén.
+  Entrega**. La entidad de entrada es la **Orden de Servicio** (`ServiceOrder`).
 - La hoja de ruta es una secuencia de tareas por **etapa**, **proceso** y
-  **puesto**, sin el concepto de “partes”. Las tareas de una etapa se ejecutan en
-  paralelo; la siguiente se desbloquea al completar la anterior.
-- Ciclo de la hoja: Borrador → Pendiente de aprobación → Aprobada → En ejecución
-  → En anexos → En calidad → Lista para entrega → Entregada.
-- La inspección se copia a la hoja de ruta como primeros pasos ya realizados.
-- Módulos actuales: órdenes de servicio, inspecciones, hojas de ruta, repuestos
-  multi-línea, proyectos, inventario, solicitudes, préstamos, calibración,
-  rendimiento, mapa de planta, usuarios, auditoría y configuración.
+  **puesto**, sin el concepto de “partes”.
 - Se retiraron campo, suministro, NDT, no conformidades, jefes de sección,
   metrología y Procura como rol. Procura es solo un destino de repuestos.
-- El login de vidrio muestra accesos rápidos solo en QA. Configuración →
-  **Restablecer datos** vuelve a la semilla (`turbopre.cami.preview.v2`).
+- Configuración → **Restablecer datos** vuelve a la semilla
+  (`turbopre.cami.preview.v3`).
 - La tabla reutilizable está en `src/components/table-kit/` y las gráficas en
   `src/components/charts/` (shadcn Chart + Recharts).
 - Detalles y modelo provisional: `docs/preview-frontend.md`.
-- Para volver al backend: sustituir los selectores del store preview por
-  `services/<dominio>/` + TanStack Query y cambiar `usePreviewSession` por
-  `useAuthStore`.
+- Para continuar la migración: reemplazar los selectores del store preview por
+  `services/<dominio>/` + TanStack Query, módulo por módulo.
 
 ## Entorno
 

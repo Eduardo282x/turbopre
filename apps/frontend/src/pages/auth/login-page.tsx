@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Navigate, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { z } from 'zod';
 import fondo from '@/assets/brand/fondo.jpg';
 import { BrandLogo } from '@/components/common/brand-logo';
 import { Button } from '@/components/ui/button';
@@ -12,35 +11,32 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ROLE_BY_ID, ROLE_OPTIONS, getRoleDisplay } from '@/features/preview/config';
+import { ROLE_BY_ID, ROLE_OPTIONS, getRoleDisplay, getRoleLabel } from '@/features/preview/config';
 import { DEMO_PASSWORD } from '@/features/preview/data/seed';
-import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
 import { usePreviewStore } from '@/features/preview/store/preview-store';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { getInitials } from '@/lib/formatters';
 import { isPreviewMode } from '@/lib/preview';
+import { authService } from '@/services/auth/auth.service';
+import { useAuthStore } from '@/stores/use-auth-store';
+import { loginSchema, type LoginInput } from '@turbopre/shared';
 
-const formSchema = z.object({
-  username: z.string().min(1, 'Ingresa tu nombre de usuario'),
-  password: z.string().min(4, 'La contraseña debe tener al menos 4 caracteres'),
-});
-
-type FormInput = z.infer<typeof formSchema>;
 const CURRENT_YEAR = new Date().getFullYear();
 
 export function LoginPage() {
-  const currentUser = useCurrentUser();
+  const currentUser = useAuthStore((state) => state.user);
+  const signIn = useAuthStore((state) => state.signIn);
   const users = usePreviewStore((state) => state.db.users);
-  const logLogin = usePreviewStore((state) => state.logLogin);
-  const signIn = usePreviewSession((state) => state.signIn);
   const navigate = useNavigate();
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const from = (location.state as { from?: string } | null)?.from ?? '/';
 
-  const form = useForm<FormInput>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
     defaultValues: { username: '', password: '' },
     mode: 'onTouched',
   });
@@ -49,35 +45,36 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
-  const enterAs = (userId: string) => {
-    const user = users.find((candidate) => candidate.id === userId);
-    if (!user) return;
-    signIn(user.id);
-    logLogin(user.id);
-    if (!remember) {
-      window.localStorage.removeItem('turbopre.preview.session');
+  const handleLogin = async (username: string, password: string) => {
+    setSubmitting(true);
+
+    try {
+      const response = await authService.login({ username, password });
+      signIn(response);
+
+      if (!remember) {
+        useAuthStore.persist.clearStorage();
+      }
+
+      toast.success(`Bienvenido, ${response.user.name}`, {
+        description: getRoleLabel(response.user.role),
+      });
+      navigate(from, { replace: true });
+    } catch (error) {
+      toast.error('No se pudo iniciar sesión', {
+        description: getApiErrorMessage(error),
+      });
+    } finally {
+      setSubmitting(false);
     }
-    toast.success(`Bienvenido, ${user.name}`, { description: getRoleDisplay(user) });
-    navigate(from, { replace: true });
+  };
+
+  const enterAs = (username: string) => {
+    void handleLogin(username, DEMO_PASSWORD);
   };
 
   const onSubmit = form.handleSubmit((values) => {
-    const user = users.find(
-      (candidate) => candidate.username.toLowerCase() === values.username.trim().toLowerCase(),
-    );
-    if (!user) {
-      toast.error('Usuario no encontrado', {
-        description: 'Verifica el nombre de usuario entregado por el administrador.',
-      });
-      return;
-    }
-    if (user.password !== values.password) {
-      toast.error('Contraseña incorrecta', {
-        description: 'Contacta al administrador si no recuerdas tu acceso.',
-      });
-      return;
-    }
-    enterAs(user.id);
+    void handleLogin(values.username.trim(), values.password);
   });
 
   const grouped = ROLE_OPTIONS.map((role) => ({
@@ -187,8 +184,12 @@ export function LoginPage() {
                 </button>
               </div>
 
-              <Button type="submit" className="h-11 w-full bg-cyan-500 text-zinc-950 hover:bg-cyan-400">
-                <LogIn /> Iniciar sesión
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="h-11 w-full bg-cyan-500 text-zinc-950 hover:bg-cyan-400"
+              >
+                <LogIn /> {submitting ? 'Ingresando…' : 'Iniciar sesión'}
               </Button>
 
               {isPreviewMode ? (
@@ -212,7 +213,7 @@ export function LoginPage() {
               <div className="mb-4 space-y-1">
                 <p className="font-heading text-sm font-semibold text-white">Acceso rápido de QA</p>
                 <p className="text-xs text-zinc-400">
-                  Solo visible en desarrollo. Permite revisar la navegación y permisos de cada rol.
+                  Solo visible en desarrollo. Inicia sesión real con cada rol para revisar la navegación y permisos.
                 </p>
               </div>
               <ScrollArea className="h-[460px] pr-3">
@@ -227,8 +228,9 @@ export function LoginPage() {
                           <button
                             key={user.id}
                             type="button"
-                            onClick={() => enterAs(user.id)}
-                            className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none"
+                            disabled={submitting}
+                            onClick={() => enterAs(user.username)}
+                            className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-left transition-colors hover:border-white/10 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none disabled:opacity-60"
                           >
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-[10px] font-bold text-cyan-200">
                               {getInitials(user.name)}

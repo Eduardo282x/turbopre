@@ -12,12 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getRoleDisplay } from '@/features/preview/config';
-import { useCurrentUser, usePreviewSession } from '@/features/preview/store/preview-session';
+import { useCurrentUser } from '@/features/preview/store/preview-session';
+import { useAuthStore } from '@/stores/use-auth-store';
 import { getInitials } from '@/lib/formatters';
 
 export function UserMenu() {
   const user = useCurrentUser();
-  const signOut = usePreviewSession((state) => state.signOut);
+  const signOut = useAuthStore((state) => state.signOut);
   const navigate = useNavigate();
 
   if (!user) return null;

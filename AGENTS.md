@@ -78,13 +78,17 @@ Deseable a futuro (nada de esto está implementado todavía):
 ## 5. Estado actual del repositorio
 
 - Monorepo Turborepo + pnpm con `apps/frontend`, `apps/backend` y `packages/shared`.
-- Auth JWT contra PostgreSQL; el administrador y los catálogos se crean con
-  `pnpm db:seed`. No hay modo demo. `GET /api/health`.
+- Auth JWT contra PostgreSQL; `pnpm db:seed` crea catálogos, el administrador
+  (`admin` / `admin1234`) y, fuera de producción, un usuario demo por rol
+  (contraseña `demo1234`). Endpoints: `/api/health`, `/api/auth/*`, `/api/users`,
+  `/api/catalogs`.
 - Prisma 7 con el modelo de dominio completo en `apps/backend/prisma/schema.prisma`;
   la documentación funcional y los diagramas están en `docs/domain-model.md`.
 - Deploy de QA preparado: `apps/frontend/vercel.json` y `render.yaml`.
-- **Pendiente**: conectar el frontend (hoy en modo preview con `localStorage`) a
-  los endpoints reales y construir las pantallas de negocio.
+- **Conectado**: login, sesión JWT, `/auth/me`, usuarios y catálogos.
+- **Pendiente**: migrar los módulos de negocio (ODS, inspecciones, hojas,
+  tareas, almacén, proyectos, analítica) del preview en `localStorage` a la API,
+  fase por fase.
 
 ## 6. Antes de implementar dominio: pregunta
 
@@ -178,5 +182,6 @@ TurboPre/
 - shadcn v4 no tiene componente `Form`: se usan `Controller` + `Field`.
 - Prisma 7 exige driver adapter (`@prisma/adapter-pg`) y genera el cliente en
   `src/generated/prisma`.
-- El login requiere `DATABASE_URL` y que se haya ejecutado `pnpm db:seed`; no hay
-  usuario demo en memoria.
+- El login requiere `DATABASE_URL` y que se haya ejecutado `pnpm db:seed`. El
+  administrador semilla es `admin` / `admin1234`; los usuarios demo de QA usan
+  `demo1234`. No hay usuario demo en memoria.

@@ -24,7 +24,7 @@ export function HistoryPage() {
   const db = usePreviewStore((state) => state.db);
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const canSeeOds = user?.role === 'GLOBAL' || user?.role === 'SALES';
+  const canSeeOds = user?.role === 'ADMIN' || user?.role === 'SALES';
   const [tab, setTab] = useState(params.get('tab') === 'ods' || (user?.role === 'SALES') ? 'ods' : 'rutas');
 
   const orders = getServiceOrdersWithRelations(db);
